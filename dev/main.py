@@ -1,14 +1,14 @@
-''' 
+'''
 main file for modifying/testing system, NOT USED for deploying model, see deploy.py
 '''
-from pinecone_driver import * 
-from gemini import * 
-from data_process import * 
+from dev.pinecone_driver import *
+from dev.gemini import *
+from dev.data_process import *
 
-def main(): 
+def main():
     # records = get_pc_records("/Users/xiang/Desktop/Advising_Bot/data/Pinecone - Sheet1.csv")
-    index_name =  "advising-bot" 
-    namespace = "bulletin" 
+    index_name =  "advising-bot"
+    namespace = "bulletin"
     index = get_pc_index(index_name)
     query= "What is Computer Science?"
     results = pc_search(index, namespace, query, 2)
@@ -20,4 +20,4 @@ def main():
     print(response.text)
 
 if __name__ == "__main__":
-    main() 
+    main()
