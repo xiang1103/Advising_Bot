@@ -1,6 +1,7 @@
 from dotenv import load_dotenv 
 from pinecone import Pinecone 
 import os 
+import time
 
 load_dotenv() 
 pinecone_key = os.getenv("Pinecone_key")  
@@ -31,7 +32,7 @@ def get_pc_index(index_name):
     if pc.has_index(index_name): 
         return pc.Index(index_name)
     else: 
-        raise (ValueError, "Index_name not found at Pinecone")
+        raise ValueError("Index_name not found at Pinecone")
  
 def create_pc_index(index_name, model="llama-text-embed-v2"):
     ''' 
@@ -53,21 +54,30 @@ def create_pc_index(index_name, model="llama-text-embed-v2"):
     return pc.Index(index_name)
 
 # insert data into pinecone index's namespace 
-def insert_pc_data(pc_index, records, namespace, batch_size=96):
+def insert_pc_data(pc_index, records, namespace, batch_size=24, max_retries=5):
     ''' 
     @param pc_index: the pinecone index 
     @param records: the complete records to be inserted 
     '''
     if (not pc_index or not records or not namespace):
         raise ValueError("One of the parameters is NULL")
-    
     assert batch_size<=96, "Batch size is max 96 to insert into Pinecone"
-    for i in range(len(records), batch_size):
-        try: 
-            pc_index.upsert_records(records[i:i+batch_size])
-        except: 
-            raise(RuntimeError, "Failed at inserting records to Pinecone Index") 
-
+    for i in range(0, len(records), batch_size):
+        batch_records = records[i:i+batch_size]
+        retry_delay_seconds = 5
+        for attempt in range(max_retries):
+            try:
+                pc_index.upsert_records(namespace=namespace, records=batch_records)
+                break
+            except Exception as e:
+                err_text = str(e)
+                is_rate_limited = "RESOURCE_EXHAUSTED" in err_text or "Too Many Requests" in err_text or "(429)" in err_text
+                if is_rate_limited and attempt < max_retries - 1:
+                    print(f"Rate limited on batch starting at {i}. Retrying in {retry_delay_seconds}s...")
+                    time.sleep(retry_delay_seconds)
+                    retry_delay_seconds = min(retry_delay_seconds * 2, 60)
+                    continue
+                raise RuntimeError(f"Failed at inserting records to Pinecone Index (batch start={i})") from e
 
 # search for top_k results from pinecone 
 def pc_search(index, namespace, query, top_k=5):
@@ -91,6 +101,6 @@ def pc_search(index, namespace, query, top_k=5):
         }
     )
         return results 
-    except: 
-        raise(RuntimeError, "Failed to find top_k responses from pinecone")
+    except Exception as e: 
+        raise RuntimeError("Failed to find top_k responses from pinecone") from e
     

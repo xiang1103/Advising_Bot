@@ -4,9 +4,11 @@ from urllib.parse import urljoin, urlparse
 import time
 import csv
 from collections import deque
+import pandas as pd
+import re
 
 class CatalogScraper:
-    def __init__(self, start_url, output_filename="stonybrook_pinecone_data.csv", max_pages=2000):
+    def __init__(self, start_url, output_filename="stonybrook_raw_data.csv", max_pages=50000):
         self.start_url = start_url
         self.domain = urlparse(start_url).netloc
         self.visited_urls = set()
@@ -15,21 +17,18 @@ class CatalogScraper:
         self.output_filename = output_filename
         self.chunk_counter = 1
 
-        # Initialize CSV
+        # Initialize raw CSV
         with open(self.output_filename, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(['_id', 'chunk_text'])
 
     def run_crawler(self):
         """Uses a Queue to crawl all links found in the HTML structure."""
-        # Initialize our queue with the starting URL
         queue = deque([self.start_url])
 
         while queue and len(self.visited_urls) < self.max_pages:
-            # Get the next URL from the front of the line
             url = queue.popleft()
 
-            # Skip if we've already visited it
             if url in self.visited_urls:
                 continue
 
@@ -43,35 +42,25 @@ class CatalogScraper:
                 print(f"[-] Failed to fetch {url}: {e}")
                 continue
 
-            # Parse the raw HTML exactly as it came from the server
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # === 1. GRAB ALL LINKS VISIBLE IN THE HTML STRUCTURE ===
-            # Because we do this BEFORE extracting any tags, it finds links in the headers,
-            # footers, sidebars, hidden dropdowns, and main text.
+            # === 1. GRAB ALL LINKS ===
             for a_tag in soup.find_all('a', href=True):
                 href = a_tag['href']
 
-                # Skip emails, phone numbers, javascript, and files
                 if href.startswith(('mailto:', 'javascript:', '#', 'tel:')) or href.lower().endswith(('.pdf', '.jpg', '.png')):
                     continue
 
                 full_url = urljoin(url, href).split('#')[0]
 
-                # If it's on our domain, hasn't been visited, and isn't already in the queue, add it!
                 if full_url not in self.visited_urls and full_url not in queue and urlparse(full_url).netloc == self.domain:
                     queue.append(full_url)
 
-            # === 2. EXTRACT AND SAVE THE ACADEMIC CONTENT ===
+            # === 2. EXTRACT TEXT ===
             self._extract_and_save_content(soup)
-
-            # Politeness delay so Stony Brook doesn't block your IP
             time.sleep(1)
 
     def _extract_and_save_content(self, soup):
-        """Cleans the HTML and extracts the H2/P tag chunks."""
-        # Now that we safely queued all the links, we can destroy the menus
-        # so they don't pollute your Pinecone CSV data.
         for unwanted in soup(['nav', 'header', 'footer', 'aside']):
             unwanted.extract()
 
@@ -107,7 +96,6 @@ class CatalogScraper:
             self._save_chunk(current_header, current_paragraphs)
 
     def _save_chunk(self, header, paragraphs):
-        """Formats and deduplicates chunks before writing to CSV."""
         if not paragraphs:
             return
 
@@ -125,12 +113,59 @@ class CatalogScraper:
 
             self.chunk_counter += 1
 
+# ==========================================
+# NEW DATA CLEANING FUNCTION
+# ==========================================
+def clean_and_finalize_data(raw_csv, final_csv):
+    print(f"\n[*] Starting data cleaning process on {raw_csv}...")
+    df = pd.read_csv(raw_csv)
+    df['chunk_text'] = df['chunk_text'].fillna('').astype(str)
+
+    def clean_text(text):
+        # 1. Remove hidden soft hyphens (fixes "Edu­ca­tion" to "Education")
+        text = text.replace('\xad', '').replace('\u00ad', '')
+        
+        # 2. Fix missing spaces after punctuation (fixes "website.The" -> "website. The")
+        text = re.sub(r'(?<=[.,!?])(?=[A-Za-z])', r' ', text)
+        
+        # 3. Fix missing spaces between lowercase and uppercase letters (fixes "EquityAdministration" -> "Equity Administration")
+        text = re.sub(r'(?<=[a-z])(?=[A-Z])', r' ', text)
+        
+        # 4. Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    # Apply the text cleaning
+    df['chunk_text'] = df['chunk_text'].apply(clean_text)
+
+    # Filter out chunks that are too short (< 15 words) or clearly gibberish
+    initial_count = len(df)
+    df = df[df['chunk_text'].str.split().str.len() >= 15]
+
+    # Re-index the IDs so they are consecutive (vec_1, vec_2, vec_3...)
+    df = df.reset_index(drop=True)
+    df['_id'] = [f"vec_{i+1}" for i in range(len(df))]
+
+    # Save final polished CSV
+    df.to_csv(final_csv, index=False)
+    
+    print(f"[+] Cleaning complete!")
+    print(f"    - Original rows: {initial_count}")
+    print(f"    - Short/useless rows removed: {initial_count - len(df)}")
+    print(f"    - Final clean rows saved to: {final_csv}")
+
+
 if __name__ == "__main__":
     start_url = "https://catalog.stonybrook.edu/index.php"
+    raw_file = "stonybrook_raw_data.csv"
+    final_file = "stonybrook_pinecone_data.csv"
 
-    # 2000 pages should be more than enough to cover the catalog
-    scraper = CatalogScraper(start_url, output_filename="stonybrook_pinecone_data.csv", max_pages=2000)
+    scraper = CatalogScraper(start_url, output_filename=raw_file, max_pages=100000)
 
     print("Starting crawler. Press Ctrl+C to stop manually.")
+    
+    # Run the scraper
     scraper.run_crawler()
-    print(f"\nFinished! Data saved to stonybrook_pinecone_data.csv")
+    
+    # Run the cleaner immediately after
+    clean_and_finalize_data(raw_csv=raw_file, final_csv=final_file) 

@@ -6,7 +6,6 @@ from dev.gemini import *
 from dev.data_process import *
 
 def main():
-    # records = get_pc_records("/Users/xiang/Desktop/Advising_Bot/data/Pinecone - Sheet1.csv")
     index_name =  "advising-bot"
     namespace = "bulletin"
     index = get_pc_index(index_name)
