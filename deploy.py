@@ -15,8 +15,9 @@ def process(query):
     namespace = "SBUBulletin"   # changed to SBUBulletin
     index = get_pc_index(index_name)
     query= query
-    results = pc_search(index, namespace, query, 2)
-    pinecone_results = retrieve_topk_text(results, 2)
+    top_k_num = 5 
+    results = pc_search(index, namespace, query, top_k_num)
+    pinecone_results = retrieve_topk_text(results, top_k_num)
     prompt = create_prompt(pinecone_results, query)
     response = generate_response(prompt)
 
