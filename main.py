@@ -10,7 +10,7 @@ def main():
     index_name =  "advising-bot" 
     namespace = "bulletin" 
     index = get_pc_index(index_name)
-    query= "What is Computer Science?"
+    query= "How many credits is CSE 114?"
     results = pc_search(index, namespace, query, 2)
 
     pinecone_results = retrieve_topk_text(results, 2)

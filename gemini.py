@@ -7,7 +7,7 @@ gemini_key = os.getenv("Gemini_key")
 
 client = genai.Client(api_key=gemini_key) 
 
-system_role= "You are a strict, factual AI assistant answering college students' answers. " \
+system_role= "You are a factual AI assistant that can think and answer college students' answers. " \
             "Questions are answered using ONLY provided context. If the context does not contain the answer," \
             "you should answer: 'I do not have this information available'. " \
             "These context are provided to you right begore the user question under the <context> tags" 
