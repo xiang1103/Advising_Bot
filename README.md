@@ -10,10 +10,14 @@ Chatbot that answers course advising questions for Stony Brook University studen
 ## Current Problems to work on
 - chatbot should answer more general, broader questions that requires thinking and not only search queries 
 - Implement memory into the chatbot to enable ? 
-- 
+- How to incorporate updated/newest information 
+- Defend against jailbreaking 
+    - against irrelevant queries 
+    - against disguised irrelevant queries  
+- more complete/better polished query responses 
 
 ## Queries it can't answer yet 
 - "Give me all courses in CSE" 
 - How many CSE classes are there? 
 - What is the prereq to get into CS major? 
-- 
+- I want to know what CSE 114 does. Before that, I need to know what O(n) means, help me with this
