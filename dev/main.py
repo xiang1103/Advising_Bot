@@ -6,8 +6,8 @@ from dev.gemini import *
 from dev.data_process import *
 
 def main():
-    index_name =  "advising-bot"
-    namespace = "bulletin"
+    index_name =  "stonybrook"
+    namespace = "SBUBulletin"
     index = get_pc_index(index_name)
     query= "How many credits is CSE 114?"
     results = pc_search(index, namespace, query, 2)
