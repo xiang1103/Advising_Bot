@@ -1,16 +1,20 @@
 # Advising_Bot
-Chatbot that answers course advising questions for Stony Brook University students 
+Chatbot that answers course advising questions for Stony Brook University students
 
-## Program Technicals 
-- Used Python web scraper to scrape all data from Stony Brook's Undergraduate Bulletin website as data 
+## Program Technicals
+- Used Python web scraper to scrape all data from Stony Brook's Undergraduate Bulletin website as data
 - Implemented RAG system with Pinecone database. Pinecone embeds all the data, then embeds the user query and returns the top-k results
-- A LLM backbone takes in the information as context to generate response.  
+- A LLM backbone takes in the information as context to generate response.
 
 
 ## Current Problems to work on
-- chatbot should answer more general, broader questions that requires thinking and not only search queries 
-- Implement memory into the chatbot to enable ? 
-- How to incorporate updated/newest information 
+- chatbot should answer more general, broader questions that requires thinking and not only search queries
+- Implement memory into the chatbot to enable ?
+- How to incorporate updated/newest information
+- Defend against jailbreaking
+    - against irrelevant queries
+    - against disguised irrelevant queries
+- more complete/better polished query responses
 
 ## Engineering Things 
 - build website to do online question answering 
