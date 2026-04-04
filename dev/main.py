@@ -14,9 +14,10 @@ def main():
 
     pinecone_results = retrieve_topk_text(results, 2)
     prompt = create_prompt(pinecone_results, query)
-    response = generate_response(prompt)
+    model = create_model() 
+    response = generate_response(prompt, model)
 
-    print(response.text)
+    print(response["messages"][0].text)
 
 if __name__ == "__main__":
     main()
