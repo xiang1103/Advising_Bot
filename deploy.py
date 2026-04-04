@@ -15,7 +15,7 @@ def process(query):
     namespace = "SBUBulletin"   # changed to SBUBulletin
     index = get_pc_index(index_name)
     query= query
-    top_k_num = 5 
+    top_k_num = 5
     results = pc_search(index, namespace, query, top_k_num)
     pinecone_results = retrieve_topk_text(results, top_k_num)
     prompt = create_prompt(pinecone_results, query)
@@ -29,15 +29,21 @@ def main():
         description="Takes in queries and returns an answer based on the provided context",
     )
 
+    # Initial Query
     parser.add_argument('-q', nargs='?')
     args = parser.parse_args()
-
-    # Check the query
-    print(args.q)
-
     if args.q:
         # call the process
         process(args.q)
+
+    while True:
+        user_input = input("\nEnter Query: ")
+        if user_input.strip().lower() in ['e', 'exit', 'quit']:
+            print("Exiting Advising Bot. Goodbye!")
+            break
+
+        if user_input.strip():
+            process(user_input)
 
 if __name__ == "__main__":
     main()
