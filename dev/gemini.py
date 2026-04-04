@@ -3,9 +3,11 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 gemini_key = os.getenv("Gemini_key")
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
-client = genai.Client(api_key=gemini_key)
+# prompt directly 
+# client = genai.Client(api_key=gemini_key)
 
 system_role= "You are Advising Bot, a factual SBU assistant trained by Stony Brook undergrads." \
             "Answer queries using provided <context> or internal knowledge, stating 'I do not have this information available' for missing or non-SBU topics like tutoring or creative writing." \
@@ -31,6 +33,28 @@ def create_prompt(context_results, query):
     Question: {query}
     """
     return prompt
+
+
+def create_model(modle="gemini-3-flash-preview"):
+    ''' 
+    instantiate the langchain gemini model 
+    '''
+    model = ChatGoogleGenerativeAI(
+        api_key= gemini_key, 
+        model=model,
+        temperature=1.0,  
+        max_retries=2,
+    )
+
+    return model 
+
+
+def generate_response(prompt, model): 
+    try: 
+        response = model.invoke(prompt)
+    except: 
+        raise ValueError("Failed to generate response")
+    return response 
 
 # generate response from gemini model
 def generate_response(prompt,model="gemini-3-flash-preview"):

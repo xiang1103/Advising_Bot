@@ -11,10 +11,6 @@ Chatbot that answers course advising questions for Stony Brook University studen
 - chatbot should answer more general, broader questions that requires thinking and not only search queries
 - Implement memory into the chatbot to enable ?
 - How to incorporate updated/newest information
-- Defend against jailbreaking
-    - against irrelevant queries
-    - against disguised irrelevant queries
-- more complete/better polished query responses
 
 ## Engineering Things 
 - build website to do online question answering 
