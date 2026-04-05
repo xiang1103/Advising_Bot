@@ -13,11 +13,16 @@ def main():
     results = pc_search(index, namespace, query, 2)
 
     pinecone_results = retrieve_topk_text(results, 2)
-    prompt = create_prompt(pinecone_results, query)
-    model = create_model() 
-    response = generate_response(prompt, model)
+    model = create_model()
+    advising_app = build_advising_graph(model=model, max_messages=8)
+    response = generate_response(
+        app=advising_app,
+        query=query,
+        context_results=pinecone_results,
+        thread_id="dev-main-session",
+    )
 
-    print(response["messages"][0].text)
+    print(response["messages"][-1].content)
 
 if __name__ == "__main__":
     main()

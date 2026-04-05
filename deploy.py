@@ -10,7 +10,7 @@ from dev.pinecone_driver import *
 from dev.gemini import *
 from dev.data_process import *
 
-def process(query):
+def process(query, advising_app, thread_id):
     index_name = "stonybrook"   # changed to stonybrook
     namespace = "SBUBulletin"   # changed to SBUBulletin
     index = get_pc_index(index_name)
@@ -18,10 +18,19 @@ def process(query):
     top_k_num = 5
     results = pc_search(index, namespace, query, top_k_num)
     pinecone_results = retrieve_topk_text(results, top_k_num)
-    prompt = create_prompt(pinecone_results, query)
-    response = generate_response(prompt)
+    response = generate_response(
+        app=advising_app,
+        query=query,
+        context_results=pinecone_results,
+        thread_id=thread_id,
+    )
 
-    print(response.text)
+    msg = response["messages"][-1]
+    content = msg.content
+    if isinstance(content, list) and content and isinstance(content[0], dict):
+        print(content[0].get("text", ""))
+    else:
+        print(content)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -32,9 +41,14 @@ def main():
     # Initial Query
     parser.add_argument('-q', nargs='?')
     args = parser.parse_args()
+
+    model = create_model()
+    advising_app = build_advising_graph(model=model, max_messages=8)
+    thread_id = "cli-session"
+
     if args.q:
         # call the process
-        process(args.q)
+        process(args.q, advising_app=advising_app, thread_id=thread_id)
 
     while True:
         user_input = input("\nEnter Query: ")
@@ -43,7 +57,7 @@ def main():
             break
 
         if user_input.strip():
-            process(user_input)
+            process(user_input, advising_app=advising_app, thread_id=thread_id)
 
 if __name__ == "__main__":
     main()
