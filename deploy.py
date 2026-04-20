@@ -6,6 +6,7 @@ CLI
     -
 '''
 import argparse
+import sys
 from dev.pinecone_driver import *
 from dev.gemini import *
 from dev.data_process import *
@@ -16,21 +17,22 @@ def process(query, advising_app, thread_id):
     index = get_pc_index(index_name)
     query= query
     top_k_num = 5
+
+    # Fetch from pinecone
     results = pc_search(index, namespace, query, top_k_num)
     pinecone_results = retrieve_topk_text(results, top_k_num)
-    response = generate_response(
+
+    print("\nAdvising Bot: ", end="", flush=True)
+
+    for chunk in generate_response_stream(
         app=advising_app,
         query=query,
         context_results=pinecone_results,
         thread_id=thread_id,
-    )
+    ):
+        print(chunk, end="", flush=True)
 
-    msg = response["messages"][-1]
-    content = msg.content
-    if isinstance(content, list) and content and isinstance(content[0], dict):
-        print(content[0].get("text", ""))
-    else:
-        print(content)
+    print("\n")
 
 def main():
     parser = argparse.ArgumentParser(

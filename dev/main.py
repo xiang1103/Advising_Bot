@@ -15,14 +15,13 @@ def main():
     pinecone_results = retrieve_topk_text(results, 2)
     model = create_model()
     advising_app = build_advising_graph(model=model, max_messages=8)
-    response = generate_response(
+    for chunk in generate_response_stream(
         app=advising_app,
         query=query,
         context_results=pinecone_results,
         thread_id="dev-main-session",
-    )
-
-    print(response["messages"][-1].content)
+    ):
+        print(chunk, end="", flush=True)
 
 if __name__ == "__main__":
     main()

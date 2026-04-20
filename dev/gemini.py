@@ -106,11 +106,11 @@ def build_advising_graph(
     )
     workflow.add_edge("summarize_node", END)
 
-    checkpointer = InMemorySaver()
+    checkpointer = InMemorySaver()  # short-term memory
     return workflow.compile(checkpointer=checkpointer)
 
 
-def generate_response(
+def generate_response_stream(
     app,
     query: str,
     context_results: list[str] | None = None,
@@ -121,23 +121,17 @@ def generate_response(
         "context_results": context_results or [],
     }
     config = {"configurable": {"thread_id": thread_id}}
-    return app.invoke(input_state, config=config)
 
-
-app = build_advising_graph()
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # Yield streams of data
+    for chunk, metadata in app.stream(input_state, config=config, stream_mode="messages"):
+        if metadata.get("langgraph_node") == "chatbot":
+            content = chunk.content
+            if isinstance(content, list) and len(content) > 0:
+                text = content[0].get("text", "")
+                if text:
+                    yield text
+            elif isinstance(content, str) and content:
+                yield content
 
 # generate response from gemini model
 # def generate_response(prompt,model="gemini-3-flash-preview"):
