@@ -1,9 +1,6 @@
 '''
 main driver file for asking user and generating response
 CLI
-
-    -h
-    -
 '''
 import argparse
 import sys

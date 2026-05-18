@@ -64,9 +64,6 @@ def chatbot_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
 
     messages = [SystemMessage(content=sys_content)] + state["messages"]
     
-
-    logging.info("Running Chatbot, exiting")
-    exit () 
     response = model.invoke(messages)
     return {"messages": [response]}
 
