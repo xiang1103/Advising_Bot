@@ -22,7 +22,6 @@ class AdvisingState(MessagesState):
 
 
 SYSTEM_ROLE=(
-    # "System",
     "You are Advising Bot, a factual SBU assistant trained by Stony Brook undergrads." \
             "Answer queries using provided <context> or internal knowledge, stating 'I do not have this information available' for missing or non-SBU topics like tutoring or creative writing." \
             "These context are provided under the <context> tags" \
@@ -83,7 +82,7 @@ def summarize_node(state: AdvisingState, model):
     if not messages_to_summarize:
         return {}
 
-    prompt = f"Distill these chat messages into a concise summary. Previous summary: {summary}."
+    prompt = f"Distill these chat messages into a concise summary. Previous summary information to include: {summary}."
     for message in messages_to_summarize:
         prompt += f"{message.type}: {message.content}\n"
 
