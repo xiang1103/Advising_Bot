@@ -16,15 +16,16 @@ def process(query, advising_app, thread_id):
     namespace = "SBUBulletin"   # changed to SBUBulletin
     index = get_pc_index(index_name)
     query= query
+
+    # retrieve and format results from pinecone 
     top_k_num = 5
 
     # Fetch from pinecone
     results = pc_search(index, namespace, query, top_k_num)
     pinecone_results = retrieve_topk_text(results, top_k_num)
-
-    print("\nAdvising Bot: ", end="", flush=True)
-
-    for chunk in generate_response_stream(
+    
+    # generate response from selected model with memory 
+    response = generate_response(
         app=advising_app,
         query=query,
         context_results=pinecone_results,

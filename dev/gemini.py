@@ -18,7 +18,6 @@ class AdvisingState(MessagesState):
 
 
 SYSTEM_ROLE=(
-    # "System",
     "You are Advising Bot, a factual SBU assistant trained by Stony Brook undergrads." \
             "Answer queries using provided <context> or internal knowledge, stating 'I do not have this information available' for missing or non-SBU topics like tutoring or creative writing." \
             "These context are provided under the <context> tags" \
@@ -41,4 +40,106 @@ def create_model(gemini_model: str = "gemini-3-flash-preview"):
 def chatbot_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
     '''
     Node - Response generation + builds prompt context (sys + summary + RAG + user history)
+
+    returns the response for state update
+    '''
+    summary = state.get("summary", "")
+    context_list = state.get("context_results", [])
+    formatted_context = " \n- ".join(context_list)
+
+    # Build the dynamic System Message
+    sys_content = SYSTEM_ROLE
+    if summary:
+        sys_content += f"\n\nSummary of earlier conversation: {summary}"
+
+    if formatted_context:
+        sys_content += (
+            f"\n\nRelevant SBU Information: \n<context>\n{formatted_context}\n</context>"
+        )
+
+    # create message for the model 
+    messages = [SystemMessage(content=sys_content)] + state["messages"]
+    response = model.invoke(messages)
+    return {"messages": [response]}
+
+
+def summarize_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
+    '''
+    Node - manages (summarize and delete messages) our memory state.
+    '''
+    summary = state.get("summary", "")
+    messages = state["messages"]
+    messages_to_summarize = messages[:-2]
+
+    if not messages_to_summarize:
+        return {}
+
+    prompt = f"Distill these chat messages into a concise summary. Previous summary: {summary}."
+    for message in messages_to_summarize:
+        prompt += f"{message.type}: {message.content}\n"
+
+    response = model.invoke([HumanMessage(content=prompt)])
+    delete_messages = [RemoveMessage(id=message.id) for message in messages_to_summarize]
+    return {"summary": response.content, "messages": delete_messages}
+
+
+def should_summarize(state: AdvisingState, max_messages: int = 8):
+    if len(state["messages"]) > max_messages:
+        return "summarize_node"
+    return END
+
+
+def build_advising_graph(
+    model: ChatGoogleGenerativeAI | None = None,
+    max_messages: int = 8,
+):
+    # create memory node and the language model 
+    workflow = StateGraph(AdvisingState)
+    llm = model or create_model()
+
+    # add workstations of what to do, partial is used to pass in more than one parameter 
+    workflow.add_node("chatbot", partial(chatbot_node, model=llm))
+    workflow.add_node("summarize_node", partial(summarize_node, model=llm))
+
+    # invoke() starts here 
+    workflow.add_edge(START, "chatbot")
+
+    # only take this edge if should_summarize condition is met 
+    workflow.add_conditional_edges(
+        "chatbot",
+        partial(should_summarize, max_messages=max_messages),
+    )
+    workflow.add_edge("summarize_node", END)
+
+    # check pointer to save the current checkpoint (short term memory)  
+    checkpointer = InMemorySaver()
+    return workflow.compile(checkpointer=checkpointer)
+
+
+def generate_response(
+    app,
+    query: str,
+    context_results: list[str] | None = None,
+    thread_id: str = "cli-session",
+):
+    input_state = {
+        "messages": [HumanMessage(content=query)],
+        "context_results": context_results or [],
+    }
+    config = {"configurable": {"thread_id": thread_id}}
+    return app.invoke(input_state, config=config)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

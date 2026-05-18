@@ -58,6 +58,7 @@ Chatbot that answers course advising questions for Stony Brook University studen
 - build website to do online question answering
 - polish README
 
+
 ## Queries it can't answer yet
 - "Give me all courses in CSE"
     - Current Issue: Pinecone only has vectors of Header + Paragraph blocks from bulletin.
