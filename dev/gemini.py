@@ -6,10 +6,14 @@ from langchain_core.messages import HumanMessage, RemoveMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
+import logging 
 
 load_dotenv()
 gemini_key = os.getenv("Gemini_key")
-
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+logging.getLogger("selectors").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("numexpr").setLevel(logging.WARNING)
 
 # Define custom state for storing our memory
 class AdvisingState(MessagesState):
@@ -45,6 +49,7 @@ def chatbot_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
     returns the response for state update
     '''
     summary = state.get("summary", "")
+
     context_list = state.get("context_results", [])
     formatted_context = " \n- ".join(context_list)
 
@@ -59,11 +64,15 @@ def chatbot_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
         )
 
     messages = [SystemMessage(content=sys_content)] + state["messages"]
+    
+
+    logging.info("Running Chatbot, exiting")
+    exit () 
     response = model.invoke(messages)
     return {"messages": [response]}
 
 
-def summarize_node(state: AdvisingState, model: ChatGoogleGenerativeAI):
+def summarize_node(state: AdvisingState, model):
     '''
     Node - manages (summarize and delete messages) our memory state.
     '''
@@ -93,36 +102,50 @@ def build_advising_graph(
     model: ChatGoogleGenerativeAI | None = None,
     max_messages: int = 8,
 ):
+    '''
+    build the workflow graph that will be executed during each program call 
+    '''
+    # create flow 
     workflow = StateGraph(AdvisingState)
     llm = model or create_model()
 
+    # create new node that executes in the chatbot_node 
     workflow.add_node("chatbot", partial(chatbot_node, model=llm))
     workflow.add_node("summarize_node", partial(summarize_node, model=llm))
 
+    # start the workflow node here 
     workflow.add_edge(START, "chatbot")
+
+    # at chatbot node, check for the conditional edge 
     workflow.add_conditional_edges(
         "chatbot",
         partial(should_summarize, max_messages=max_messages),
     )
+
+    # if went to summarize node, end here 
     workflow.add_edge("summarize_node", END)
 
+    # add to short term memory 
     checkpointer = InMemorySaver()  # short-term memory
     return workflow.compile(checkpointer=checkpointer)
 
 
 def generate_response_stream(
-    app,
-    query: str,
+    app,    # the state/graph of memory 
+    query: str,    
     context_results: list[str] | None = None,
-    thread_id: str = "default-session",
+    thread_id: str = "cli-session",
 ):
+    '''
+    generate response and handle the states for memory 
+    '''
     input_state = {
         "messages": [HumanMessage(content=query)],
         "context_results": context_results or [],
     }
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Yield streams of data
+    # chunk: actual data from chatbot. Metadata: which node of the workflow is on 
     for chunk, metadata in app.stream(input_state, config=config, stream_mode="messages"):
         if metadata.get("langgraph_node") == "chatbot":
             content = chunk.content
@@ -132,12 +155,3 @@ def generate_response_stream(
                     yield text
             elif isinstance(content, str) and content:
                 yield content
-
-# generate response from gemini model
-# def generate_response(prompt,model="gemini-3-flash-preview"):
-#     '''
-#     @param model: the gemini API model to call
-#     @param prompt: prompt for the API model
-#     '''
-#     response = client.models.generate_content(model=model, contents=prompt)
-#     return response
