@@ -3,10 +3,18 @@ main driver file for asking user and generating response
 CLI
 '''
 import argparse
-import sys
-from dev.pinecone_driver import *
-from dev.gemini import *
-from dev.data_process import *
+import os
+import logging
+
+from langgraph.checkpoint.postgres import PostgresSaver
+from dev.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
+from dev.gemini import create_model, build_advising_graph, generate_response_stream
+from backend.supabase_connect import save_conversation
+
+logging.basicConfig(level=logging.WARNING, force=True)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING) 
 
 def process(query, advising_app, thread_id):
     # connect with pinecone 
@@ -21,6 +29,7 @@ def process(query, advising_app, thread_id):
 
     print("\nAdvising Bot: ", end="", flush=True)
 
+    full_response =""
     for chunk in generate_response_stream(
         app=advising_app,
         query=query,
@@ -28,8 +37,10 @@ def process(query, advising_app, thread_id):
         thread_id=thread_id,
     ):
         print(chunk, end="", flush=True)
+        full_response+=chunk 
 
     print("\n")
+    return full_response
 
 
 def main():
@@ -39,26 +50,27 @@ def main():
     )
 
     # Initial Query
-    parser.add_argument('-q', nargs='?')
-    args = parser.parse_args()
-
+    thread_id = "user_session" 
     model = create_model()
-    advising_app = build_advising_graph(model=model, max_messages=8)
-    thread_id = "cli-session"
+    workflow = build_advising_graph(model=model, max_messages=8)
+    db_url = os.environ.get("DATABASE_URL")
 
-    if args.q:
-        # call the process
-        process(args.q, advising_app=advising_app, thread_id=thread_id)
+    # open connection to database 
+    with PostgresSaver.from_conn_string(db_url) as checkpointer:
+        checkpointer.setup() 
+        # creates the chat app 
+        advising_app= workflow.compile(checkpointer)
+        while True:
+            user_input = input("\nEnter Your Questions: ")
+            user_input_processed= user_input.strip()
+            if user_input_processed.lower() in ['e', 'exit', 'quit']:
+                print("Exiting Advising Bot. Goodbye!")
+                break
 
-    while True:
-        user_input = input("\nEnter Your Questions: ")
-        user_input= user_input.strip()
-        if user_input.lower() in ['e', 'exit', 'quit']:
-            print("Exiting Advising Bot. Goodbye!")
-            break
-
-        if user_input:
-            process(user_input, advising_app=advising_app, thread_id=thread_id)
+            if user_input_processed:
+                model_response = process(user_input_processed, advising_app=advising_app, thread_id=thread_id)
+                # save response to supabase 
+                save_conversation(thread_id, user_input, model_response)
 
 if __name__ == "__main__":
     main()

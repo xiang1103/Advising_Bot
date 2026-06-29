@@ -1,9 +1,8 @@
 '''
 main file for modifying/testing system, NOT USED for deploying model, see deploy.py
 '''
-from dev.pinecone_driver import *
-from dev.gemini import *
-from dev.data_process import *
+from dev.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
+from dev.gemini import create_model, build_advising_graph, generate_response_stream
 
 def main():
     index_name =  "stonybrook"

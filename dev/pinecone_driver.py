@@ -5,7 +5,6 @@ import time
 
 load_dotenv() 
 pinecone_key = os.getenv("Pinecone_key")  
-
 pc = Pinecone(api_key=pinecone_key)  
 default_text_field= "chunk_text"
 
@@ -62,6 +61,7 @@ def insert_pc_data(pc_index, records, namespace, batch_size=24, max_retries=5):
     if (not pc_index or not records or not namespace):
         raise ValueError("One of the parameters is NULL")
     assert batch_size<=96, "Batch size is max 96 to insert into Pinecone"
+    
     for i in range(0, len(records), batch_size):
         batch_records = records[i:i+batch_size]
         retry_delay_seconds = 5

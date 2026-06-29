@@ -7,6 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 import logging 
+from langgraph.checkpoint.postgres import PostgresSaver 
 
 load_dotenv()
 gemini_key = os.getenv("Gemini_key")
@@ -121,9 +122,7 @@ def build_advising_graph(
     # if went to summarize node, end here 
     workflow.add_edge("summarize_node", END)
 
-    # add to short term memory 
-    checkpointer = InMemorySaver()  # short-term memory
-    return workflow.compile(checkpointer=checkpointer)
+    return workflow 
 
 
 def generate_response_stream(
