@@ -1,9 +1,6 @@
 '''
 main driver file for asking user and generating response
 CLI
-
-    -h
-    -
 '''
 import argparse
 import sys
@@ -12,10 +9,10 @@ from backend.dev.gemini import *
 from backend.dev.data_process import *
 
 def process(query, advising_app, thread_id):
+    # connect with pinecone 
     index_name = "stonybrook"   # changed to stonybrook
     namespace = "SBUBulletin"   # changed to SBUBulletin
     index = get_pc_index(index_name)
-    query= query
     top_k_num = 5
 
     # Fetch from pinecone
@@ -33,6 +30,7 @@ def process(query, advising_app, thread_id):
         print(chunk, end="", flush=True)
 
     print("\n")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -53,12 +51,13 @@ def main():
         process(args.q, advising_app=advising_app, thread_id=thread_id)
 
     while True:
-        user_input = input("\nEnter Query: ")
-        if user_input.strip().lower() in ['e', 'exit', 'quit']:
+        user_input = input("\nEnter Your Questions: ")
+        user_input= user_input.strip()
+        if user_input.lower() in ['e', 'exit', 'quit']:
             print("Exiting Advising Bot. Goodbye!")
             break
 
-        if user_input.strip():
+        if user_input:
             process(user_input, advising_app=advising_app, thread_id=thread_id)
 
 if __name__ == "__main__":

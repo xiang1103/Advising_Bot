@@ -1,5 +1,5 @@
 ''' 
-all functions regarding data processing 
+all functions regarding data processing into pinecone database  
 '''
 import pandas as pd 
 
@@ -8,7 +8,7 @@ def get_pc_records(path):
     '''
     @param path: path to the data 
     '''
-    df = pd.read_csv("/Users/xiang/Desktop/Advising_Bot/data/Pinecone - Sheet1.csv")
+    df = pd.read_csv(path)
     df['_id'] = df['_id'].astype(str) 
     records = df.to_dict("records")
     return records 
