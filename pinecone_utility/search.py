@@ -3,6 +3,7 @@ file for all functions related to searching/using Pinecone
 '''
 
 from pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
+from dev.gemini import generate_response_stream 
 
 def process(query, advising_app, thread_id):
     # connect with pinecone 
