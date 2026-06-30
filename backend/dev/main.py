@@ -1,9 +1,9 @@
 '''
 main file for modifying/testing system, NOT USED for deploying model, see deploy.py
 '''
-from dev.pinecone_driver import *
-from dev.gemini import *
-from dev.data_process import *
+from backend.dev.pinecone_driver import *
+from backend.dev.gemini import *
+from backend.dev.data_process import *
 
 def main():
     index_name =  "stonybrook"

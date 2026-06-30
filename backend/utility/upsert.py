@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dev.pinecone_driver import insert_pc_data, create_pc_index
+from backend.dev.pinecone_driver import insert_pc_data, create_pc_index
 import pandas as pd
 
 def upsert_to_pinecone(csv_file, index_name, namespace):

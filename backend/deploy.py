@@ -7,9 +7,9 @@ CLI
 '''
 import argparse
 import sys
-from dev.pinecone_driver import *
-from dev.gemini import *
-from dev.data_process import *
+from backend.dev.pinecone_driver import *
+from backend.dev.gemini import *
+from backend.dev.data_process import *
 
 def process(query, advising_app, thread_id):
     index_name = "stonybrook"   # changed to stonybrook

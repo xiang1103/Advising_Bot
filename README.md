@@ -2,6 +2,20 @@
 
 A specialized, RAG-powered conversational agent designed to answer course advising, prerequisite, and academic policy questions for SBU undergraduates. The bot acts as a factual assistant, strictly grounded in official university data.
 
+
+## How to Get Started
+
+`cd ./frontend`
+
+Run: `npm run dev`
+
+Start another terminal and make sure you activated your venv
+
+`cd ./backend`
+
+Run: `python -m uvicorn backend.app:app --reload --port 8000`
+
+
 ## 🚀 Overview
 Navigating university bulletins and major requirements can be overwhelming. Advising Bot solves this by combining a custom knowledge retrieval system with a Large Language Model (LLM) to provide instant, accurate, and context-aware academic guidance.
 
@@ -36,7 +50,6 @@ Because the system relies on vector-based similarity search (Pinecone) rather th
 
 ---
 *Built by SBU Undergrads, for SBU Undergrads.*
-
 
 
 
