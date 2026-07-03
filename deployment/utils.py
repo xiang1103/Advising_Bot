@@ -12,16 +12,17 @@ def setup_logging(verbose: bool = False) -> None:
     Args:
         verbose: if True, sets level to DEBUG; otherwise WARNING
     '''
-    level = logging.DEBUG if verbose else logging.ERROR
+    level = logging.INFO if verbose else logging.ERROR
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(filename)s::%(funcName)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         force=True,
     )
-    if not verbose:
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+    # silence the supabase logger.info() logs  
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 def print_welcome_message() -> None:
     '''

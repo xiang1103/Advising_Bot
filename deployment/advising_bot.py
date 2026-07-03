@@ -9,13 +9,17 @@ import argparse
 import logging
 
 from langgraph.checkpoint.postgres import PostgresSaver
-from dev.gemini import create_model, build_advising_graph, generate_response_stream
+from dev.gemini import create_model, build_advising_graph, generate_response
 from db.supabase_connect import save_conversation
 from deployment.utils import print_welcome_message, print_goodbye_message, setup_logging
-from pinecone_utility.search import process
+from pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 
 
 logger= logging.getLogger(__name__)
+PC_INDEX_NAME = "stonybrook"
+PC_NAMESPACE = "SBUBulletin" 
+PC_TOP_K= 5 
+THREAD_ID = "user_session" 
 
 def deploy():
     parser = argparse.ArgumentParser(
@@ -27,22 +31,24 @@ def deploy():
 
     setup_logging(verbose=args.verbose)
 
-
     # Initial Query
-    thread_id = "user_session" 
     model = create_model()
+    logger.info("Building workflow graph")
     workflow = build_advising_graph(model=model, max_messages=8)
     db_url = os.environ.get("DATABASE_URL")
+
+    # connect to pinecone (default parameter names) 
+    pc_index = get_pc_index(PC_INDEX_NAME)
 
     # open connection to database 
     logger.info("Connecting to server")
     with PostgresSaver.from_conn_string(db_url) as checkpointer:
         checkpointer.setup() 
         # creates the chat app 
-        logger.info("Creating Advising Bot workflow")
-        advising_app= workflow.compile(checkpointer)
+        logger.info("Creating Advising Bot")
+        advising_bot= workflow.compile(checkpointer)
+        print_welcome_message() 
         while True:
-            print_welcome_message() 
             user_input = input("\nEnter Your Questions: ")
             user_input_processed= user_input.strip()
             if not user_input_processed:
@@ -50,10 +56,18 @@ def deploy():
             if user_input_processed.lower() in ['e', 'exit', 'quit']:
                 print_goodbye_message() 
                 break
+            # search at pinecone 
+            pc_results = pc_search(pc_index, PC_NAMESPACE, user_input_processed, PC_TOP_K)
+            pc_results = retrieve_topk_text(pc_results,PC_TOP_K)
 
-            model_response = process(user_input_processed, advising_app=advising_app, thread_id=thread_id)
+            # generate model response 
+            model_response = generate_response(advising_bot,
+                                               user_input_processed,
+                                                pc_results,
+                                                THREAD_ID)
+            
             # save response to supabase 
-            save_conversation(thread_id, user_input, model_response)
+            save_conversation(THREAD_ID, user_input, model_response)
             logger.info("Conversation saved")
 
 if __name__ == "__main__":
