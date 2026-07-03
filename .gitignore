@@ -23,3 +23,4 @@ backend/data/
 # Next.js build and cache folders
 frontend/.next/
 .next/
+**/__init__.py

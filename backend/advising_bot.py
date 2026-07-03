@@ -9,9 +9,9 @@ import argparse
 import logging
 
 from langgraph.checkpoint.postgres import PostgresSaver
-from dev.gemini import create_model, build_advising_graph, generate_response
+from src.gemini import create_model, build_advising_graph, generate_response
 from db.supabase_connect import save_conversation
-from deployment.utils import print_welcome_message, print_goodbye_message, setup_logging
+from backend.src.utils import print_welcome_message, print_goodbye_message, setup_logging
 from pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 
 
