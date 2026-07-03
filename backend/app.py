@@ -2,8 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.dev.gemini import build_advising_graph, create_model, generate_response_stream
-from backend.dev.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
+from backend.src.gemini import build_advising_graph, create_model, generate_response_stream
+from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 
 app = FastAPI()
 

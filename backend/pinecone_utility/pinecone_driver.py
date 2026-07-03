@@ -1,11 +1,14 @@
+'''
+this file contains all the pinecone utility functions 
+'''
 from dotenv import load_dotenv 
 from pinecone import Pinecone 
 import os 
 import time
+import pandas as pd 
 
 load_dotenv() 
 pinecone_key = os.getenv("Pinecone_key")  
-
 pc = Pinecone(api_key=pinecone_key)  
 default_text_field= "chunk_text"
 
@@ -62,6 +65,7 @@ def insert_pc_data(pc_index, records, namespace, batch_size=24, max_retries=5):
     if (not pc_index or not records or not namespace):
         raise ValueError("One of the parameters is NULL")
     assert batch_size<=96, "Batch size is max 96 to insert into Pinecone"
+    
     for i in range(0, len(records), batch_size):
         batch_records = records[i:i+batch_size]
         retry_delay_seconds = 5
@@ -104,3 +108,19 @@ def pc_search(index, namespace, query, top_k=5):
     except Exception as e: 
         raise RuntimeError("Failed to find top_k responses from pinecone") from e
     
+
+def upsert_to_pinecone(csv_file, index_name, namespace):
+    '''
+    @param csv_file: the csv file to be inserted in pinecone
+    @param index_name: the name of the index to be inserted into
+    @param namespace: the namespace within the index to be inserted into inside Pinecone 
+    '''
+    df = pd.read_csv(csv_file)
+    records = df.to_dict(orient='records')
+    try:
+        pc_index = create_pc_index(index_name)
+        insert_pc_data(pc_index, records, namespace)
+        print(f"Successfully upserted data from {csv_file} to Pinecone index '{index_name}' in namespace '{namespace}'.")
+    except Exception as e:
+        print(f"Error occurred while upserting data: {e}")
+        raise

@@ -44,8 +44,14 @@ Because the system relies on vector-based similarity search (Pinecone) rather th
 ## Next Steps
 - [ ] **Web Interface:** Transition the bot from a Terminal CLI to a fully hosted web application (e.g., React, Streamlit, or FastAPI) for student access.
 - [ ] **Advanced Reasoning:** Implement multi-hop querying or GraphRAG to allow the bot to answer broader, more complex advising scenarios.
-- [ ] **Dynamic Data Sync:** Build an automated pipeline to incorporate new/updated bulletin information without requiring a full manual database wipe and re-scrape.
 - [ ] **Polished Memory:** Refine the LangGraph system prompt so the bot doesn't re-introduce itself ("Hello! I am Advising Bot...") deep into an ongoing conversation.
 
 ---
 *Built by SBU Undergrads, for SBU Undergrads.*
+
+
+## Dependencies 
+```
+pip install langgraph-checkpoint-postgres
+pip install supabase
+```

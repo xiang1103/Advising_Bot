@@ -2,11 +2,13 @@ import os
 from functools import partial
 
 from dotenv import load_dotenv
+from typing import Any, List 
 from langchain_core.messages import HumanMessage, RemoveMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 import logging 
+from langgraph.checkpoint.postgres import PostgresSaver 
 
 load_dotenv()
 gemini_key = os.getenv("Gemini_key")
@@ -121,9 +123,7 @@ def build_advising_graph(
     # if went to summarize node, end here 
     workflow.add_edge("summarize_node", END)
 
-    # add to short term memory 
-    checkpointer = InMemorySaver()  # short-term memory
-    return workflow.compile(checkpointer=checkpointer)
+    return workflow 
 
 
 def generate_response_stream(
@@ -151,3 +151,28 @@ def generate_response_stream(
                     yield text
             elif isinstance(content, str) and content:
                 yield content
+
+
+def generate_response(advising_bot:Any, query:str, context_results:List[str], thread_id:str):
+    '''
+    generate response from the gemini model 
+    Args: 
+        advising_bot: the workflow graph from langgraph 
+        query: user question 
+        context_results: list of context returned from pinecone 
+        thread_id: thread_id of where the conversation is stored 
+
+    '''
+    print("\nAdvising Bot: ", end="", flush=True)
+    full_response =""
+    for chunk in generate_response_stream(
+        app=advising_bot,
+        query=query,
+        context_results=context_results,
+        thread_id=thread_id,
+    ):
+        print(chunk, end="", flush=True)
+        full_response+=chunk 
+
+    print("\n")
+    return full_response 
