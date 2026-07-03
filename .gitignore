@@ -1,4 +1,25 @@
+# Local environment variables
 .env
 __pycache__/
 .vscode/*
 /data/
+.env.local
+
+# Python caches
+**/__pycache__/
+*.py[cod]
+
+# Editor settings
+.vscode/
+
+# Data directories (ignores data at root or inside backend)
+data/
+backend/data/
+*.csv
+
+# Dependency folders (ignores node_modules anywhere in the project)
+**/node_modules/
+
+# Next.js build and cache folders
+frontend/.next/
+.next/
