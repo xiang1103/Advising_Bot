@@ -6,8 +6,8 @@ import { Lightbulb, Mic, Globe, Paperclip, Send } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 
 const PLACEHOLDERS = [
-  "Generate a course schedule",
-  "Create a new project with Next.js",
+  "What's my graduation requirement?",
+  "What classes to take?",
   "What is the meaning of life?",
   "What is the best class to take?",
   "How to cook a delicious schedule?",
