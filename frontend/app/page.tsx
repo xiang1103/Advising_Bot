@@ -189,8 +189,11 @@ export default function Page() {
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-slate-950">
+
       <div className="flex h-full w-full overflow-hidden bg-white">
         <aside className="hidden w-[320px] shrink-0 border-r border-slate-800 bg-slate-950 px-5 py-6 text-slate-50 md:flex md:flex-col">
+          
+          {/* create the side bar on the side */}
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-slate-950">
               <GraduationCap className="h-5 w-5" />
@@ -199,9 +202,9 @@ export default function Page() {
               <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
                 Advising Bot
               </p>
-              <h1 className="text-xl font-semibold">Session sidebar</h1>
             </div>
           </div>
+
 
           <button
             className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
@@ -212,27 +215,11 @@ export default function Page() {
             New session
           </button>
 
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-            <div className="flex items-center gap-2 text-emerald-300">
-              <ShieldCheck className="h-4 w-4" />
-              Grounded answers only
-            </div>
-            <p className="mt-3 leading-6 text-slate-300">
-              This UI is designed for Supabase-backed session storage and
-              simple, fast advising conversations.
-            </p>
-          </div>
-
-          <div className="mt-6 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-            <Search className="h-4 w-4" />
-            Search sessions
-          </div>
-
+          {/* displays all sessions on the left side  */}
           <div className="mt-6 flex-1 overflow-y-auto pr-1">
             <div className="space-y-3">
               {sessionList.map((session) => {
                 const isActive = session.id === activeSessionId;
-
                 return (
                   <button
                     key={session.id}
@@ -246,15 +233,9 @@ export default function Page() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold">{session.title}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
-                          {session.updatedAt}
-                        </p>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
                     </div>
-                    <p className="mt-3 text-sm leading-6 opacity-80">
-                      {session.summary}
-                    </p>
                   </button>
                 );
               })}
@@ -263,22 +244,17 @@ export default function Page() {
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))]">
-          <header className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4 md:px-8">
+          
+          {/* Header of the page  */}
+          <header className="flex items-center justify-center border-b border-slate-200/80 px-5 py-4 md:px-8">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-                Active session
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold text-slate-950">
+              <h2 className="mt-1 text-2xl  text-slate-950 text-center">
                 {activeSession.title}
               </h2>
             </div>
-
-            <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 md:flex">
-              <MessagesSquare className="h-4 w-4" />
-              Supabase-ready session timeline
-            </div>
           </header>
 
+          {/* main chat display  */}
           <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8">
             <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
               <div className="space-y-4">
@@ -310,26 +286,10 @@ export default function Page() {
                   </div>
                 )}
               </div>
-
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-                  Quick context
-                </p>
-                <div className="mt-4 space-y-3 text-sm text-slate-700">
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                    Current topic: undergraduate advising
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                    Backend: Supabase session persistence
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                    Frontend stack: TypeScript, Tailwind, shadcn structure
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
+          {/* topic suggestions for chat  */}
           <div className="border-t border-slate-200/80 px-5 py-5 md:px-8">
             <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-500">
               <span className="rounded-full bg-slate-100 px-3 py-1">
@@ -347,8 +307,10 @@ export default function Page() {
             </div>
             <AIChatInput onSend={handleSend} />
           </div>
+
         </section>
       </div>
+
     </main>
   );
 }
