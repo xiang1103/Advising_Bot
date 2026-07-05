@@ -12,19 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
-
-type Session = {
-  id: string;
-  title: string;
-  updatedAt: string;
-  summary: string;
-};
-
-type Message = {
-  id: string;
-  role: "assistant" | "user";
-  content: string;
-};
+import {Session, Message} from "@/lib/types"; 
 
 const sessions: Session[] = [
   {
@@ -280,9 +268,7 @@ export default function Page() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm text-slate-500 shadow-sm">
-                    This session is empty. Ask a question to start the
-                    conversation.
+                  <div>
                   </div>
                 )}
               </div>
