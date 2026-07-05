@@ -7,19 +7,16 @@ Want to know about course work details? Why going through static webpages like t
 
 `cd ./frontend`
 
-Run: `npm run dev`
+`npm install`
+`npm run dev`
 
-Start another terminal and make sure you activated your venv
-
-`cd ./backend`
+Start another terminal, stay in project directory, 
 
 Run: `python -m uvicorn backend.app:app --reload --port 8000`
 
 
 ## 🚀 Overview
 Navigating university bulletins and major requirements can be overwhelming. Advising Bot solves this by combining a custom knowledge retrieval system with a Large Language Model (LLM) to provide instant, accurate, and context-aware academic guidance.
-## Overview
-Navigating university bulletins and major requirements with a custom knowledge retrieval system (RAG) with a Large Language Model (LLM) backbone to provide instant, accurate, and context-aware guidance.
 
 ## Key Features
 - **Data Ingestion:** A custom Python web scraper that extracts structured text (Headers + Paragraphs) directly from the official Stony Brook Undergraduate Bulletin.
