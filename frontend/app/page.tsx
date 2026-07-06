@@ -83,12 +83,16 @@ const createNewSession = (): Session => ({
 });
 
 export default function Page() {
+  // hard coded variables for starters 
   const [sessionList, setSessionList] = useState<Session[]>(sessions);
   const [messagesBySession, setMessagesBySession] = useState<
     Record<string, Message[]>
   >(initialMessagesBySession);
+
+  // auto set the first session ID 
   const [activeSessionId, setActiveSessionId] = useState(sessionList[0].id);
 
+  // define the current session 
   const activeSession = useMemo(
     () =>
       sessionList.find((session) => session.id === activeSessionId) ??
@@ -179,7 +183,7 @@ export default function Page() {
     <main className="h-screen w-screen overflow-hidden bg-slate-950">
 
       <div className="flex h-full w-full overflow-hidden bg-white">
-        <aside className="hidden w-[320px] shrink-0 border-r border-slate-800 bg-slate-950 px-5 py-6 text-slate-50 md:flex md:flex-col">
+        <aside className="hidden w-[320px] shrink-0 border-r border-slate-800 sidebar-bg px-5 py-6 text-slate-50 md:flex md:flex-col">
           
           {/* create the side bar on the side */}
           <div className="flex items-center gap-3">
@@ -244,34 +248,40 @@ export default function Page() {
 
           {/* main chat display  */}
           <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8">
-            <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-              <div className="space-y-4">
+            <div className="space-y-4">
                 {activeMessages.length > 0 ? (
                   activeMessages.map((message) => (
                     <div
                       key={message.id}
-                      className={`max-w-2xl rounded-3xl border px-5 py-4 text-sm leading-6 shadow-sm ${
+                      className={`flex ${
                         message.role === "assistant"
-                          ? "border-slate-200 bg-white text-slate-800"
-                          : "ml-auto border-slate-950 bg-slate-950 text-white"
+                          ? "justify-start"
+                          : "justify-end"
                       }`}
                     >
-                      <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] opacity-60">
-                        {message.role === "assistant" ? (
-                          <BookOpen className="h-3.5 w-3.5" />
-                        ) : (
-                          <FileText className="h-3.5 w-3.5" />
-                        )}
-                        {message.role}
+                      <div
+                        className={`rounded-3xl border px-5 py-4 text-sm leading-6 shadow-sm break-words ${
+                          message.role === "assistant"
+                            ? "max-w-xl border-slate-200 bg-white text-slate-800"
+                            : "max-w-2xl border-slate-950 user-response-bg text-white"
+                        }`}
+                      >
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] opacity-60">
+                          {message.role === "assistant" ? (
+                            <BookOpen className="h-3.5 w-3.5" />
+                          ) : (
+                            <FileText className="h-3.5 w-3.5" />
+                          )}
+                          {message.role}
+                        </div>
+                        {message.content}
                       </div>
-                      {message.content}
                     </div>
                   ))
                 ) : (
                   <div>
                   </div>
                 )}
-              </div>
             </div>
           </div>
 
