@@ -57,3 +57,11 @@ select {
 ::selection {
   background: rgba(59, 130, 246, 0.2);
 }
+
+.user-response-bg {
+  background-color: #a5a58d ;
+}
+
+.sidebar-bg {
+  background-color: #004040;
+}
