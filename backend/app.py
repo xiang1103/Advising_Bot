@@ -44,7 +44,7 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-def process_and_return_text(advising_app, query: str, thread_id: str) -> str:
+def process_and_return_text(advising_app: Any, query: str, thread_id: str) -> str:
     index = get_pc_index(INDEX_NAME)
     results = pc_search(index, NAMESPACE, query, top_k=5)
     pinecone_results = retrieve_topk_text(results, top_k=5)
