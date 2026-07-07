@@ -1,11 +1,31 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from langgraph.checkpoint.postgres import PostgresSaver
 
 from backend.src.gemini import build_advising_graph, create_model, generate_response_stream
 from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 
-app = FastAPI()
+MODEL = create_model()
+INDEX_NAME = "stonybrook"
+NAMESPACE = "SBUBulletin"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # An adapter that open the Postgres connection and keeps it alive
+    with PostgresSaver.from_conn_string(DATABASE_URL) as checkpointer:
+        # Create checkpoint tables
+        checkpointer.setup()
+        app.state.advising_app = build_advising_graph(
+            model=MODEL, max_messages=8
+        ).compile(checkpointer=checkpointer)
+        yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,30 +36,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# Pydantic classes for chat entities
 class ChatRequest(BaseModel):
     session_id: str
     message: str
-
-
 class ChatResponse(BaseModel):
     reply: str
 
 
-MODEL = create_model()
-ADVISING_APP = build_advising_graph(model=MODEL, max_messages=8)
-INDEX_NAME = "stonybrook"
-NAMESPACE = "SBUBulletin"
-
-
-def process_and_return_text(query: str, thread_id: str) -> str:
+def process_and_return_text(advising_app, query: str, thread_id: str) -> str:
     index = get_pc_index(INDEX_NAME)
     results = pc_search(index, NAMESPACE, query, top_k=5)
     pinecone_results = retrieve_topk_text(results, top_k=5)
 
     chunks: list[str] = []
     for chunk in generate_response_stream(
-        app=ADVISING_APP,
+        app=advising_app,
         query=query,
         context_results=pinecone_results,
         thread_id=thread_id,
@@ -58,6 +70,7 @@ def health_check():
 def chat(payload: ChatRequest):
     try:
         reply = process_and_return_text(
+            advising_app=app.state.advising_app,
             query=payload.message,
             thread_id=payload.session_id,
         )
