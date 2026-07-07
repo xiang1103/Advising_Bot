@@ -13,19 +13,21 @@ from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, re
 MODEL = create_model()
 INDEX_NAME = "stonybrook"
 NAMESPACE = "SBUBulletin"
-DATABASE_URL = os.getenv("DATABASE_URL")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # An adapter that open the Postgres connection and keeps it alive
-    with PostgresSaver.from_conn_string(DATABASE_URL) as checkpointer:
-        # Create checkpoint tables
-        checkpointer.setup()
-        app.state.advising_app = build_advising_graph(
-            model=MODEL, max_messages=8
-        ).compile(checkpointer=checkpointer)
-        yield
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required to enable Postgres checkpointing."
+        )
 
+    # Adapter that opens the Postgres connection and keeps it alive for the app lifespan.
+    with PostgresSaver.from_conn_string(db_url) as checkpointer:
+        checkpointer.setup()
+        app.state.advising_app = build_advising_graph(model=MODEL, max_messages=8).compile(
+            checkpointer=checkpointer
+        )
+        yield
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
