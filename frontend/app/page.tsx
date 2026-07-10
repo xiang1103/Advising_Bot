@@ -113,7 +113,12 @@ export default function Page() {
     setActiveSessionId(newSession.id);
   };
 
+  /**
+   * Send question to generate response and store into db 
+   * @param text - input question from user 
+   */
   const handleSend = async (text: string) => {
+
     const userMessage: Message = {
       id: `${Date.now()}-user`,
       role: "user",
@@ -146,6 +151,7 @@ export default function Page() {
 
       const data: { reply: string } = await response.json();
 
+      // render bot messages 
       const assistantMessage: Message = {
         id: `${Date.now()}-assistant`,
         role: "assistant",
@@ -164,9 +170,7 @@ export default function Page() {
         id: `${Date.now()}-error`,
         role: "assistant",
         content:
-          error instanceof Error
-            ? error.message
-            : "Something went wrong while contacting the backend.",
+          "Advising Bot failed to generate response. Please try again!"
       };
 
       setMessagesBySession((currentMessages) => ({
@@ -286,7 +290,7 @@ export default function Page() {
           </div>
 
           {/* topic suggestions for chat  */}
-          <div className="border-t border-slate-200/80 px-5 py-5 md:px-8">
+          <div className="border-t border-slate-200/80 px-5 pt-5 pb-8 md:px-8">
             <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-500">
               <span className="rounded-full bg-slate-100 px-3 py-1">
                 Course prereqs
