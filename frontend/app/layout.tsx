@@ -13,7 +13,9 @@ export default function RootLayout({
 }>){
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/* suppressHydrationWarning: browser extensions (e.g. Grammarly) inject
+          attributes onto <body> before hydration, causing a false mismatch. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

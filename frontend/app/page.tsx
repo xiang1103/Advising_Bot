@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
+import { MarkdownMessage } from "@/components/ui/markdown-message";
 import {Session, Message} from "@/lib/types";
 
 const sessions: Session[] = [
@@ -82,6 +83,15 @@ const createNewSession = (): Session => ({
   summary: "Start a new advising conversation.",
 });
 
+// three jumping dots shown inside an assistant bubble while awaiting the first tokens
+const TypingDots = () => (
+  <div className="flex items-center gap-1 py-1">
+    <span className="typing-dot" style={{ animationDelay: "0ms" }} />
+    <span className="typing-dot" style={{ animationDelay: "150ms" }} />
+    <span className="typing-dot" style={{ animationDelay: "300ms" }} />
+  </div>
+);
+
 export default function Page() {
   // hard coded variables for starters
   const [sessionList, setSessionList] = useState<Session[]>(sessions);
@@ -118,6 +128,10 @@ export default function Page() {
     startNewSession();
   };
 
+  /**
+   * Send question to generate response and store into db
+   * @param text - input question from user
+   */
   const handleSend = async (text: string) => {
     const sessionId = activeSessionId ?? startNewSession().id;
     const isFirstMessage = (messagesBySession[sessionId] ?? []).length === 0;
@@ -132,10 +146,21 @@ export default function Page() {
       );
     }
 
+    const assistantId = `${Date.now()}-assistant`;
+
     const userMessage: Message = {
       id: `${Date.now()}-user`,
       role: "user",
       content: text,
+    };
+
+    // append the user's message plus an empty, pending assistant bubble (the
+    // typing dots) so the UI reacts instantly before any tokens arrive.
+    const assistantPlaceholder: Message = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      pending: true,
     };
 
     setMessagesBySession((currentMessages) => ({
@@ -143,8 +168,19 @@ export default function Page() {
       [sessionId]: [
         ...(currentMessages[sessionId] ?? []),
         userMessage,
+        assistantPlaceholder,
       ],
     }));
+
+    // apply an update to the pending assistant message (matched by id) in place.
+    const updateAssistant = (updater: (message: Message) => Message) => {
+      setMessagesBySession((currentMessages) => ({
+        ...currentMessages,
+        [sessionId]: (currentMessages[sessionId] ?? []).map((message) =>
+          message.id === assistantId ? updater(message) : message,
+        ),
+      }));
+    };
 
     try {
       const response = await fetch("http://localhost:8000/chat", {
@@ -158,41 +194,35 @@ export default function Page() {
         }),
       });
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error("Failed to get a response from the backend");
       }
 
-      const data: { reply: string } = await response.json();
+      // stream the reply, appending each chunk into the assistant bubble.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-      const assistantMessage: Message = {
-        id: `${Date.now()}-assistant`,
-        role: "assistant",
-        content: data.reply,
-      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      setMessagesBySession((currentMessages) => ({
-        ...currentMessages,
-        [sessionId]: [
-          ...(currentMessages[sessionId] ?? []),
-          assistantMessage,
-        ],
-      }));
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+
+        updateAssistant((message) => ({
+          ...message,
+          content: message.content + chunk,
+          pending: false,
+        }));
+      }
+
+      // clear the pending flag in case the stream produced zero chunks.
+      updateAssistant((message) => ({ ...message, pending: false }));
     } catch (error) {
-      const assistantMessage: Message = {
-        id: `${Date.now()}-error`,
-        role: "assistant",
-        content:
-          error instanceof Error
-            ? error.message
-            : "Something went wrong while contacting the backend.",
-      };
-
-      setMessagesBySession((currentMessages) => ({
-        ...currentMessages,
-        [sessionId]: [
-          ...(currentMessages[sessionId] ?? []),
-          assistantMessage,
-        ],
+      updateAssistant((message) => ({
+        ...message,
+        content: "Advising Bot failed to generate response. Please try again!",
+        pending: false,
       }));
     }
   };
@@ -284,15 +314,25 @@ export default function Page() {
                             : "max-w-2xl border-slate-950 user-response-bg text-white"
                         }`}
                       >
-                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] opacity-60">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.05em] opacity-60">
                           {message.role === "assistant" ? (
                             <BookOpen className="h-3.5 w-3.5" />
                           ) : (
                             <FileText className="h-3.5 w-3.5" />
                           )}
-                          {message.role}
+                          {message.role === "assistant"
+                            ? "Advising Bot"
+                            : message.role}
                         </div>
-                        {message.content}
+                        {message.role === "assistant" ? (
+                          message.pending && message.content === "" ? (
+                            <TypingDots />
+                          ) : (
+                            <MarkdownMessage content={message.content} />
+                          )
+                        ) : (
+                          message.content
+                        )}
                       </div>
                     </div>
                   ))
@@ -316,7 +356,7 @@ export default function Page() {
           </div>
 
           {/* topic suggestions for chat  */}
-          <div className="border-t border-slate-200/80 px-5 py-5 md:px-8">
+          <div className="border-t border-slate-200/80 px-5 pt-5 pb-8 md:px-8">
             <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-500">
               <span className="rounded-full bg-slate-100 px-3 py-1">
                 Course prereqs
