@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
-import { Lightbulb, Mic, Globe, Paperclip, Send } from "lucide-react";
+import { Mic, Paperclip, Send } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 
 const PLACEHOLDERS = [
@@ -21,8 +21,6 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isActive, setIsActive] = useState(false);
-  const [thinkActive, setThinkActive] = useState(false);
-  const [deepSearchActive, setDeepSearchActive] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -59,11 +57,6 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   const containerVariants: Variants = {
     collapsed: {
       height: 68,
-      boxShadow: "none",
-      transition: { type: "spring" as const, stiffness: 120, damping: 18 },
-    },
-    expanded: {
-      height: 128,
       boxShadow: "none",
       transition: { type: "spring" as const, stiffness: 120, damping: 18 },
     },
@@ -104,13 +97,15 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   };
 
   const handleSend = async () => {
-    const text = inputValue.trim();
+    // remove front and trailing spaces 
+    const text = inputValue.trimEnd().trimStart();
 
     if (!text) return;
 
-    await onSend(text);
+    // clear the input immediately so it doesn't linger while awaiting the backend
     setInputValue("");
     setIsActive(false);
+    await onSend(text);
   };
 
   return (
@@ -119,7 +114,7 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
         ref={wrapperRef}
         className="w-full"
         variants={containerVariants}
-        animate={isActive || inputValue ? "expanded" : "collapsed"}
+        animate="collapsed"
         initial="collapsed"
         style={{
           overflow: "hidden",
@@ -209,81 +204,6 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
               <Send size={18} />
             </button>
           </div>
-
-          <motion.div
-            className="flex w-full items-center justify-start px-4 text-sm"
-            variants={{
-              hidden: {
-                opacity: 0,
-                y: 20,
-                pointerEvents: "none" as const,
-                transition: { duration: 0.25 },
-              },
-              visible: {
-                opacity: 1,
-                y: 0,
-                pointerEvents: "auto" as const,
-                transition: { duration: 0.35, delay: 0.08 },
-              },
-            }}
-            initial="hidden"
-            animate={isActive || inputValue ? "visible" : "hidden"}
-            style={{ marginTop: 8 }}
-          >
-            <div className="flex items-center gap-3">
-              <button
-                className={`group flex items-center gap-1 rounded-full px-4 py-2 font-medium transition-all ${
-                  thinkActive
-                    ? "bg-blue-600/10 outline outline-blue-600/60 text-blue-950"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-                title="Think"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setThinkActive((a) => !a);
-                }}
-              >
-                <Lightbulb
-                  className="transition-all group-hover:fill-yellow-300"
-                  size={18}
-                />
-                Think
-              </button>
-
-              <motion.button
-                className={`flex items-center justify-start overflow-hidden whitespace-nowrap rounded-full py-2 pl-[9px] pr-4 font-medium transition ${
-                  deepSearchActive
-                    ? "bg-blue-600/10 outline outline-blue-600/60 text-blue-950"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-                title="Deep Search"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeepSearchActive((a) => !a);
-                }}
-                initial={false}
-                animate={{
-                  width: deepSearchActive ? 125 : 36,
-                  paddingLeft: deepSearchActive ? 8 : 9,
-                }}
-              >
-                <div className="flex-1">
-                  <Globe size={18} />
-                </div>
-                <motion.span
-                  className="pb-[2px]"
-                  initial={false}
-                  animate={{
-                    opacity: deepSearchActive ? 1 : 0,
-                  }}
-                >
-                  Deep Search
-                </motion.span>
-              </motion.button>
-            </div>
-          </motion.div>
         </div>
       </motion.div>
     </div>

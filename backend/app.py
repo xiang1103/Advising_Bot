@@ -1,9 +1,9 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langgraph.checkpoint.postgres import PostgresSaver
 
@@ -43,25 +43,6 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     session_id: str
     message: str
-class ChatResponse(BaseModel):
-    reply: str
-
-
-def process_and_return_text(advising_app: Any, query: str, thread_id: str) -> str:
-    index = get_pc_index(INDEX_NAME)
-    results = pc_search(index, NAMESPACE, query, top_k=5)
-    pinecone_results = retrieve_topk_text(results, top_k=5)
-
-    chunks: list[str] = []
-    for chunk in generate_response_stream(
-        app=advising_app,
-        query=query,
-        context_results=pinecone_results,
-        thread_id=thread_id,
-    ):
-        chunks.append(chunk)
-
-    return "".join(chunks).strip()
 
 
 @app.get("/health")
@@ -69,14 +50,32 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")
 def chat(payload: ChatRequest):
+    # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
+    # (the status can no longer be changed once the streaming response has started).
     try:
-        reply = process_and_return_text(
-            advising_app=app.state.advising_app,
-            query=payload.message,
-            thread_id=payload.session_id,
-        )
-        return ChatResponse(reply=reply)
+        index = get_pc_index(INDEX_NAME)
+        results = pc_search(index, NAMESPACE, payload.message, top_k=5)
+        pinecone_results = retrieve_topk_text(results, top_k=5)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    def token_generator():
+        try:
+            for chunk in generate_response_stream(
+                app=app.state.advising_app,
+                query=payload.message,
+                context_results=pinecone_results,
+                thread_id=payload.session_id,
+            ):
+                yield chunk
+        except Exception:
+            # Streaming has already begun, so we can't change the status code.
+            # Emit a trailing marker the client can surface instead of truncating silently.
+            yield "\n\n[Advising Bot failed to finish generating this response.]"
+
+    return StreamingResponse(
+        token_generator(),
+        media_type="text/plain; charset=utf-8",
+    )
