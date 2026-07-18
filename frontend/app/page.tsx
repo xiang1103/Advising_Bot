@@ -233,8 +233,13 @@ export default function Page() {
       <div className="flex h-full w-full overflow-hidden bg-white">
         <aside className="hidden w-[320px] shrink-0 border-r border-slate-800 sidebar-bg px-5 py-6 text-slate-50 md:flex md:flex-col">
 
-          {/* create the side bar on the side */}
-          <div className="flex items-center gap-3">
+          {/* logo — click to return to the home page */}
+          <button
+            type="button"
+            onClick={() => setActiveSessionId(null)}
+            className="flex items-center gap-3 rounded-2xl text-left transition hover:opacity-80"
+            title="Go to home page"
+          >
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-slate-950">
               <GraduationCap className="h-5 w-5" />
             </div>
@@ -243,7 +248,7 @@ export default function Page() {
                 Advising Bot
               </p>
             </div>
-          </div>
+          </button>
 
 
           <button
