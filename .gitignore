@@ -24,3 +24,6 @@ backend/data/
 frontend/.next/
 .next/
 **/__init__.py
+
+# TypeScript incremental build cache
+*.tsbuildinfo
