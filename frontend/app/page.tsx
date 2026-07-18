@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
-import {Session, Message} from "@/lib/types"; 
+import {Session, Message} from "@/lib/types";
 
 const sessions: Session[] = [
   {
@@ -83,26 +83,25 @@ const createNewSession = (): Session => ({
 });
 
 export default function Page() {
-  // hard coded variables for starters 
+  // hard coded variables for starters
   const [sessionList, setSessionList] = useState<Session[]>(sessions);
   const [messagesBySession, setMessagesBySession] = useState<
     Record<string, Message[]>
   >(initialMessagesBySession);
 
-  // auto set the first session ID 
-  const [activeSessionId, setActiveSessionId] = useState(sessionList[0].id);
+  // auto set the first session ID
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  // define the current session 
+  // define the current session
   const activeSession = useMemo(
     () =>
-      sessionList.find((session) => session.id === activeSessionId) ??
-      sessionList[0],
+      sessionList.find((session) => session.id === activeSessionId),
     [activeSessionId, sessionList],
   );
 
-  const activeMessages = messagesBySession[activeSessionId] ?? [];
+  const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
 
-  const handleNewSession = () => {
+  const startNewSession = (): Session => {
     const newSession = createNewSession();
 
     setSessionList((currentSessions) => [newSession, ...currentSessions]);
@@ -111,9 +110,28 @@ export default function Page() {
       [newSession.id]: [],
     }));
     setActiveSessionId(newSession.id);
+
+    return newSession;
+  };
+
+  const handleNewSession = () => {
+    startNewSession();
   };
 
   const handleSend = async (text: string) => {
+    const sessionId = activeSessionId ?? startNewSession().id;
+    const isFirstMessage = (messagesBySession[sessionId] ?? []).length === 0;
+
+    if (isFirstMessage) {
+      setSessionList((currentSessions) =>
+        currentSessions.map((session) =>
+          session.id === sessionId
+            ? { ...session, title: text.trim().slice(0, 25) }
+            : session,
+        ),
+      );
+    }
+
     const userMessage: Message = {
       id: `${Date.now()}-user`,
       role: "user",
@@ -122,8 +140,8 @@ export default function Page() {
 
     setMessagesBySession((currentMessages) => ({
       ...currentMessages,
-      [activeSessionId]: [
-        ...(currentMessages[activeSessionId] ?? []),
+      [sessionId]: [
+        ...(currentMessages[sessionId] ?? []),
         userMessage,
       ],
     }));
@@ -135,7 +153,7 @@ export default function Page() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          session_id: activeSessionId,
+          session_id: sessionId,
           message: text,
         }),
       });
@@ -154,8 +172,8 @@ export default function Page() {
 
       setMessagesBySession((currentMessages) => ({
         ...currentMessages,
-        [activeSessionId]: [
-          ...(currentMessages[activeSessionId] ?? []),
+        [sessionId]: [
+          ...(currentMessages[sessionId] ?? []),
           assistantMessage,
         ],
       }));
@@ -171,8 +189,8 @@ export default function Page() {
 
       setMessagesBySession((currentMessages) => ({
         ...currentMessages,
-        [activeSessionId]: [
-          ...(currentMessages[activeSessionId] ?? []),
+        [sessionId]: [
+          ...(currentMessages[sessionId] ?? []),
           assistantMessage,
         ],
       }));
@@ -184,7 +202,7 @@ export default function Page() {
 
       <div className="flex h-full w-full overflow-hidden bg-white">
         <aside className="hidden w-[320px] shrink-0 border-r border-slate-800 sidebar-bg px-5 py-6 text-slate-50 md:flex md:flex-col">
-          
+
           {/* create the side bar on the side */}
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-slate-950">
@@ -236,19 +254,19 @@ export default function Page() {
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))]">
-          
+
           {/* Header of the page  */}
           <header className="flex items-center justify-center border-b border-slate-200/80 px-5 py-4 md:px-8">
             <div>
               <h2 className="mt-1 text-2xl  text-slate-950 text-center">
-                {activeSession.title}
+                {activeSession?.title ?? "New Chat"}
               </h2>
             </div>
           </header>
 
           {/* main chat display  */}
           <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8">
-            <div className="space-y-4">
+            <div className="h-full space-y-4">
                 {activeMessages.length > 0 ? (
                   activeMessages.map((message) => (
                     <div
@@ -279,7 +297,19 @@ export default function Page() {
                     </div>
                   ))
                 ) : (
-                  <div>
+                  <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400 text-slate-950">
+                      <MessagesSquare className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-slate-950">
+                        Welcome to Advising Bot
+                      </h3>
+                      <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                        Ask about course prerequisites, degree progress, or transfer
+                        credits. Your first message starts a new session.
+                      </p>
+                    </div>
                   </div>
                 )}
             </div>
