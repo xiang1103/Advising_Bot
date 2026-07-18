@@ -97,7 +97,7 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   };
 
   const handleSend = async () => {
-    // remove front and trailing spaces 
+    // remove front and trailing spaces
     const text = inputValue.trimEnd().trimStart();
 
     if (!text) return;
@@ -126,15 +126,6 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
       >
         <div className="flex h-full w-full flex-col items-stretch">
           <div className="flex w-full items-center gap-2 border border-slate-200 bg-white px-3 py-3">
-            <button
-              className="rounded-full p-3 transition hover:bg-gray-100"
-              title="Attach file"
-              type="button"
-              tabIndex={-1}
-            >
-              <Paperclip size={20} />
-            </button>
-
             <div className="relative flex-1">
               <input
                 type="text"
@@ -184,14 +175,6 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
               </div>
             </div>
 
-            <button
-              className="rounded-full p-3 transition hover:bg-gray-100"
-              title="Voice input"
-              type="button"
-              tabIndex={-1}
-            >
-              <Mic size={20} />
-            </button>
             <button
               className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700"
               title="Send"
