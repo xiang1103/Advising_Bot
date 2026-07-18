@@ -13,6 +13,7 @@ type Message = {
 id: string;
 role: "assistant" | "user";
 content: string;
+pending?: boolean; // assistant bubble awaiting/streaming its first tokens
 };
 
 export type {Session, Message}; 
