@@ -27,3 +27,9 @@ frontend/.next/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local bug-review reports
+find-bugs-report/
+
+# Local code-review output
+critique-me-reports/
