@@ -4,14 +4,7 @@ import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Mic, Paperclip, Send } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
-
-const PLACEHOLDERS = [
-  "What's my graduation requirement?",
-  "What classes to take?",
-  "What is the meaning of life?",
-  "What is the best class to take?",
-  "How to cook a delicious schedule?",
-];
+import { PLACEHOLDERS } from "@/lib/utils";
 
 type AIChatInputProps = {
   onSend: (text: string) => Promise<void>;

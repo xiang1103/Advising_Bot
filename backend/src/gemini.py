@@ -5,10 +5,8 @@ from dotenv import load_dotenv
 from typing import Any, List 
 from langchain_core.messages import HumanMessage, RemoveMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 import logging 
-from langgraph.checkpoint.postgres import PostgresSaver 
 
 load_dotenv()
 gemini_key = os.getenv("Gemini_key")
