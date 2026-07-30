@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Advising Bot",
-  description: "Simple advising assistant UI with session tracking.",
+  description: "Simple advising assistant UI with thread tracking.",
 };
 
 export default function RootLayout({
