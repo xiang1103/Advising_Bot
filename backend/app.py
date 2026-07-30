@@ -1,24 +1,37 @@
+'''
+entry point program that runs from top to bottom, variable app is imported 
+'''
+
 import os
 from contextlib import asynccontextmanager
-
+import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from langgraph.checkpoint.postgres import PostgresSaver
 
-from backend.src.gemini import build_advising_graph, create_model, generate_response_stream
+from backend.src.langgraph import build_advising_graph, generate_response_stream
+from backend.src.models.gemini import create_model
 from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
+from backend.utils import ChatRequest
 
-MODEL = create_model()
+logger = logging.getLogger(__name__)
+
+
+gemini_model= "gemini-3-flash-preview" 
+MODEL = create_model(gemini_model)
+logger.info(f"Model created: {gemini_model}")
+
+# global variables for retrieving pinecone 
 INDEX_NAME = "stonybrook"
 NAMESPACE = "SBUBulletin"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv("LANGGRAPH_CHECKPOINT_URL")
     if not db_url:
         raise RuntimeError(
-            "DATABASE_URL environment variable is required to enable Postgres checkpointing."
+            "LANGGRAPH_CHECKPOINT_URL environment variable is required to enable LangGraph's Postgres checkpointing."
         )
 
     # Adapter that opens the Postgres connection and keeps it alive for the app lifespan.
@@ -28,8 +41,10 @@ async def lifespan(app: FastAPI):
             checkpointer=checkpointer
         )
         yield
+
 app = FastAPI(lifespan=lifespan)
 
+# allow front end to send HTTP requests over to backend 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
@@ -38,11 +53,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Pydantic classes for chat entities
-class ChatRequest(BaseModel):
-    session_id: str
-    message: str
 
 
 @app.get("/health")

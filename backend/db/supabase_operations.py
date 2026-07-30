@@ -6,6 +6,8 @@ backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SE
 
 logger= logging.getLogger(__name__)
 
+
+
 def save_conversation(thread_id, user_msg, bot_response):
     '''
     saves the user question and bot response to the thread id in supabase 
@@ -25,7 +27,7 @@ def get_full_history(thread_id):
     ''' 
     return the full history without pagination 
     '''
-    return supabase.table("conversations") \
+    return backend_server.table("conversations") \
         .select("role, content, created_at") \
         .eq("thread_id", thread_id) \
         .order("created_at") \
@@ -43,7 +45,7 @@ def get_history(thread_id, page_num=1, page_size=10):
     start_index =  (page_num-1) * page_size 
     end_index = start_index + page_size-1 
 
-    return supabase.table("conversations") \
+    return backend_server.table("conversations") \
         .select("role, content, created_at") \
         .eq("thread_id", thread_id) \
         .order("created_at") \

@@ -12,7 +12,7 @@ Want to know about course work details? Why going through static webpages like t
 
 Start another terminal, stay in project directory, 
 
-Run: `python -m uvicorn backend.app:app --reload --port 8000`
+Run: ```python -m uvicorn backend.app:app --reload --port 8000```
 
 
 ## 🚀 Overview
@@ -52,3 +52,10 @@ Because the system relies on vector-based similarity search (Pinecone) rather th
 pip install langgraph-checkpoint-postgres
 pip install supabase
 ```
+Mac: ```brew install supabase/tap/supabase```  
+Windows: 
+```scoop bucket add supabase https://github.com/supabase/scoop-bucket.git```  
+
+```scoop install supabase ``` 
+
+If want to do deployment with Supabase, download Docker Desktop [here](https://docs.docker.com/desktop/setup/install/mac-install/)
