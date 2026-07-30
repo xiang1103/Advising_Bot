@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.postgres import PostgresSaver
 
-from backend.src.gemini import build_advising_graph, create_model, generate_response_stream
+from backend.src.langgraph import build_advising_graph, generate_response_stream
+from backend.src.models.gemini import create_model
 from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 from backend.utils import ChatRequest
 

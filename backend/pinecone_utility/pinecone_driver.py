@@ -8,7 +8,7 @@ import time
 import pandas as pd 
 
 load_dotenv() 
-pinecone_key = os.getenv("Pinecone_key")  
+pinecone_key = os.getenv("PINECONE_KEY")  
 pc = Pinecone(api_key=pinecone_key)  
 default_text_field= "chunk_text"
 
