@@ -13,22 +13,22 @@ import {
 } from "lucide-react";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
 import { MarkdownMessage } from "@/components/ui/markdown-message";
-import {Session, Message} from "@/lib/types";
-import {initialMessagesBySession, sessions} from "@/lib/utils"; 
+import {Thread, Message} from "@/lib/types";
+import {initialMessagesByThread, threads} from "@/lib/utils"; 
 
 
 
-const createSessionId = () => {
+const createThreadId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `session-${crypto.randomUUID()}`;
+    return `thread-${crypto.randomUUID()}`;
   }
 
-  return `session-${Date.now()}`;
+  return `thread-${Date.now()}`;
 };
 
-const createNewSession = (): Session => ({
-  id: createSessionId(),
-  title: "New session",
+const createNewThread = (): Thread => ({
+  id: createThreadId(),
+  title: "New thread",
   updatedAt: "Just now",
   summary: "Start a new advising conversation.",
 });
@@ -44,38 +44,38 @@ const TypingDots = () => (
 
 export default function Page() {
   // hard coded variables for starters
-  const [sessionList, setSessionList] = useState<Session[]>(sessions);
-  const [messagesBySession, setMessagesBySession] = useState<
+  const [threadList, setThreadList] = useState<Thread[]>(threads);
+  const [messagesByThread, setMessagesByThread] = useState<
     Record<string, Message[]>
-  >(initialMessagesBySession);
+  >(initialMessagesByThread);
 
-  // auto set the first session ID
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // auto set the first thread ID
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
-  // define the current session
-  const activeSession = useMemo(
+  // define the current thread
+  const activeThread = useMemo(
     () =>
-      sessionList.find((session) => session.id === activeSessionId),
-    [activeSessionId, sessionList],
+      threadList.find((thread) => thread.id === activeThreadId),
+    [activeThreadId, threadList],
   );
 
-  const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
+  const activeMessages = activeThreadId ? messagesByThread[activeThreadId] ?? [] : [];
 
-  const startNewSession = (): Session => {
-    const newSession = createNewSession();
+  const startNewThread = (): Thread => {
+    const newThread = createNewThread();
 
-    setSessionList((currentSessions) => [newSession, ...currentSessions]);
-    setMessagesBySession((currentMessages) => ({
+    setThreadList((currentThreads) => [newThread, ...currentThreads]);
+    setMessagesByThread((currentMessages) => ({
       ...currentMessages,
-      [newSession.id]: [],
+      [newThread.id]: [],
     }));
-    setActiveSessionId(newSession.id);
+    setActiveThreadId(newThread.id);
 
-    return newSession;
+    return newThread;
   };
 
-  const handleNewSession = () => {
-    startNewSession();
+  const handleNewThread = () => {
+    startNewThread();
   };
 
   /**
@@ -83,15 +83,15 @@ export default function Page() {
    * @param text - input question from user
    */
   const handleSend = async (text: string) => {
-    const sessionId = activeSessionId ?? startNewSession().id;
-    const isFirstMessage = (messagesBySession[sessionId] ?? []).length === 0;
+    const threadId = activeThreadId ?? startNewThread().id;
+    const isFirstMessage = (messagesByThread[threadId] ?? []).length === 0;
 
     if (isFirstMessage) {
-      setSessionList((currentSessions) =>
-        currentSessions.map((session) =>
-          session.id === sessionId
-            ? { ...session, title: text.trim().slice(0, 25) }
-            : session,
+      setThreadList((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === threadId
+            ? { ...thread, title: text.trim().slice(0, 25) }
+            : thread,
         ),
       );
     }
@@ -113,10 +113,10 @@ export default function Page() {
       pending: true,
     };
 
-    setMessagesBySession((currentMessages) => ({
+    setMessagesByThread((currentMessages) => ({
       ...currentMessages,
-      [sessionId]: [
-        ...(currentMessages[sessionId] ?? []),
+      [threadId]: [
+        ...(currentMessages[threadId] ?? []),
         userMessage,
         assistantPlaceholder,
       ],
@@ -124,9 +124,9 @@ export default function Page() {
 
     // apply an update to the pending assistant message (matched by id) in place.
     const updateAssistant = (updater: (message: Message) => Message) => {
-      setMessagesBySession((currentMessages) => ({
+      setMessagesByThread((currentMessages) => ({
         ...currentMessages,
-        [sessionId]: (currentMessages[sessionId] ?? []).map((message) =>
+        [threadId]: (currentMessages[threadId] ?? []).map((message) =>
           message.id === assistantId ? updater(message) : message,
         ),
       }));
@@ -140,7 +140,7 @@ export default function Page() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          session_id: sessionId,
+          thread_id: threadId,
           message: text,
         }),
       });
@@ -187,7 +187,7 @@ export default function Page() {
           {/* logo — click to return to the home page */}
           <button
             type="button"
-            onClick={() => setActiveSessionId(null)}
+            onClick={() => setActiveThreadId(null)}
             className="flex items-center gap-3 rounded-2xl text-left transition hover:opacity-80"
             title="Go to home page"
           >
@@ -204,22 +204,22 @@ export default function Page() {
 
           <button
             className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-            onClick={handleNewSession}
+            onClick={handleNewThread}
             type="button"
           >
             <Plus className="h-4 w-4" />
-            New session
+            New thread
           </button>
 
-          {/* displays all sessions on the left side  */}
+          {/* displays all threads on the left side  */}
           <div className="mt-6 flex-1 overflow-y-auto pr-1">
             <div className="space-y-3">
-              {sessionList.map((session) => {
-                const isActive = session.id === activeSessionId;
+              {threadList.map((thread) => {
+                const isActive = thread.id === activeThreadId;
                 return (
                   <button
-                    key={session.id}
-                    onClick={() => setActiveSessionId(session.id)}
+                    key={thread.id}
+                    onClick={() => setActiveThreadId(thread.id)}
                     className={`w-full rounded-3xl border p-4 text-left transition ${
                       isActive
                         ? "border-amber-300 bg-white text-slate-950"
@@ -228,7 +228,7 @@ export default function Page() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold">{session.title}</p>
+                        <p className="font-semibold">{thread.title}</p>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
                     </div>
@@ -245,7 +245,7 @@ export default function Page() {
           <header className="flex items-center justify-center border-b border-slate-200/80 px-5 py-4 md:px-8">
             <div>
               <h2 className="mt-1 text-2xl  text-slate-950 text-center">
-                {activeSession?.title ?? "New Chat"}
+                {activeThread?.title ?? "New Chat"}
               </h2>
             </div>
           </header>
@@ -303,7 +303,7 @@ export default function Page() {
                       </h3>
                       <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
                         Ask about course prerequisites, degree progress, or transfer
-                        credits. Your first message starts a new session.
+                        credits. Your first message starts a new thread.
                       </p>
                     </div>
                   </div>

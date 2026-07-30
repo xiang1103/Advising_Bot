@@ -1,5 +1,5 @@
 /* utility functions used */
-import { Session, Message } from "@/lib/types";
+import { Thread, Message } from "@/lib/types";
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -13,8 +13,8 @@ export const PLACEHOLDERS = [
   "How to cook a delicious schedule?",
 ]; 
 
-export const initialMessagesBySession:Record<string, Message[]>= {
-  "session-1": [
+export const initialMessagesByThread:Record<string, Message[]>= {
+  "thread-1": [
     {
       id: "m1",
       role: "assistant",
@@ -27,7 +27,7 @@ export const initialMessagesBySession:Record<string, Message[]>= {
       content: "What should I take before CSE 216?",
     },
   ],
-  "session-2": [
+  "thread-2": [
     {
       id: "m1",
       role: "assistant",
@@ -35,7 +35,7 @@ export const initialMessagesBySession:Record<string, Message[]>= {
         "Send me the course code and institution, and I’ll help translate it into the likely advising outcome.",
     },
   ],
-  "session-3": [
+  "thread-3": [
     {
       id: "m1",
       role: "assistant",
@@ -45,21 +45,21 @@ export const initialMessagesBySession:Record<string, Message[]>= {
   ],
 }; 
 
-export const sessions: Session[] = [
+export const threads: Thread[] = [
   {
-    id: "session-1",
+    id: "thread-1",
     title: "CSE major planning",
     updatedAt: "2m ago",
     summary: "Prereqs, electives, and next steps for the CS track.",
   },
   {
-    id: "session-2",
+    id: "thread-2",
     title: "Transfer credits",
     updatedAt: "18m ago",
     summary: "How outside courses map to SBC requirements.",
   },
   {
-    id: "session-3",
+    id: "thread-3",
     title: "General education",
     updatedAt: "Yesterday",
     summary: "HUM, SNW, and SBC learning goal questions.",
