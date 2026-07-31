@@ -5,16 +5,14 @@ entry point program that runs from top to bottom, variable app is imported
 import os
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.postgres import PostgresSaver
-
-from backend.agent_graph.langgraph import build_advising_graph, generate_response_stream
+from backend.agent_graph.langgraph import build_advising_graph
 from backend.clients.llm.gemini import create_model
-from backend.clients.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
-from backend.schema import ChatRequest
 from backend.config import GEMINI_MODEL 
+from backend.routers import chat 
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +47,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(chat.router)
 
 
 @app.get("/health")

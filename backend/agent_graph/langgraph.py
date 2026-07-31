@@ -141,28 +141,3 @@ def generate_response_stream(
                     yield text
             elif isinstance(content, str) and content:
                 yield content
-
-
-def generate_response(advising_bot:Any, query:str, context_results:List[str], thread_id:str):
-    '''
-    generate response from the gemini model  
-    Args: 
-        advising_bot: the workflow graph from langgraph 
-        query: user question 
-        context_results: list of context returned from pinecone 
-        thread_id: thread_id of where the conversation is stored 
-
-    '''
-    print("\nAdvising Bot: ", end="", flush=True)
-    full_response =""
-    for chunk in generate_response_stream(
-        app=advising_bot,
-        query=query,
-        context_results=context_results,
-        thread_id=thread_id,
-    ):
-        print(chunk, end="", flush=True)
-        full_response+=chunk 
-
-    print("\n")
-    return full_response 
