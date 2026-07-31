@@ -46,7 +46,7 @@ def chat(payload: ChatRequest, request:Request):
         pinecone_results = retrieve_topk_text(results, top_k=5)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    
+    logger.info("Generating Responses")
     return StreamingResponse(
         token_generator(request, query=payload.message,pinecone_results= pinecone_results, thread_id=payload.thread_id),
         media_type="text/plain; charset=utf-8",
