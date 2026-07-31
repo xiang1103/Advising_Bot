@@ -1,3 +1,6 @@
+'''
+Function for running webscraping undergrad bulletin website 
+'''
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse

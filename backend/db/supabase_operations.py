@@ -2,10 +2,10 @@ import os
 import supabase 
 from supabase import create_client
 import logging 
-backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
 logger= logging.getLogger(__name__)
-
+backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+logger.info("Supabase connected")
 
 
 def save_conversation(thread_id, user_msg, bot_response):
