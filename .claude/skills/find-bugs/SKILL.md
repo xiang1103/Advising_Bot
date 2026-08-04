@@ -1,13 +1,13 @@
 ---
 name: find-bugs
-description: Pre-PR bug hunt. Reads the code the user points at, reconstructs what it is supposed to do, traces every execution path against that intent, and writes a severity-ranked findings report with reasoning traces, reproduction cases, and suggested patches to bug-reports/. Use this whenever the user asks for a review of code they just wrote — "look this over before I open a PR", "review my changes", "check this for bugs", "did I miss any edge cases", "sanity check this implementation", "anything wrong with this?" — or hands over files/folders and asks what's broken. Use it even when the request is casual or when the code looks short and obvious, and use it for logic errors, unhandled edge cases, error handling gaps, and syntax problems alike.
+description: Pre-PR bug hunt. Reads the code the user points at, reconstructs what it is supposed to do, traces every execution path against that intent, and writes a severity-ranked findings report with reasoning traces, reproduction cases, and suggested patches to claudeskill_reports/find-bugs/. Use this whenever the user asks for a review of code they just wrote — "look this over before I open a PR", "review my changes", "check this for bugs", "did I miss any edge cases", "sanity check this implementation", "anything wrong with this?" — or hands over files/folders and asks what's broken. Use it even when the request is casual or when the code looks short and obvious, and use it for logic errors, unhandled edge cases, error handling gaps, and syntax problems alike.
 ---
 
 # Find Bugs
 
 A pre-PR review. The goal is to catch what the author's own eyes slide past: the branch never taken, the input never tried, the failure never handled.
 
-The output is a markdown report in `bug-reports/`, not a chat message and not a set of edits to their code. The author decides what to act on. Try running the code with commands, but if they fail trace the logic of the program directly without runnng the code. 
+The output is a markdown report in `claudeskill_reports/find-bugs/`, not a chat message and not a set of edits to their code. The author decides what to act on. Try running the code with commands, but if they fail trace the logic of the program directly without runnng the code. 
 
 ## The core discipline
 
@@ -103,7 +103,9 @@ Order the report by severity, then confidence. Anything below Low is a nit — i
 
 ## The report
 
-Write to `bug-reports/review-YYYY-MM-DD-<scope>.md`, where `<scope>` is a short slug for what was reviewed (`auth-refactor`, `parser`, `staged-changes`). Create `bug-reports/` if it doesn't exist. If a report with that name exists, append `-2`, `-3`, and so on rather than overwriting.
+Create a folder called `claudeskill_reports` at the repository root, then within it a subfolder named for this skill — `claudeskill_reports/find-bugs/`. Create both if they don't exist, and add `claudeskill_reports/` to `.gitignore` if it isn't already there.
+
+Write to `claudeskill_reports/find-bugs/review-YYYY-MM-DD-<scope>.md`, where `<scope>` is a short slug for what was reviewed (`auth-refactor`, `parser`, `staged-changes`). If a report with that name exists, append `-2`, `-3`, and so on rather than overwriting.
 
 Use this structure:
 
@@ -175,4 +177,4 @@ Keep every part of that structure. The summary exists to be skimmed in ten secon
 
 ## After writing
 
-Tell the user the path, then give the headline in two or three sentences: how many findings, the worst one, and whether you'd open the PR. Don't restate the report in chat — they have the file. The report should contain both the findings and suggested fixes. Write the report markdown file inside find-bugs-report folder in the root directory. Also add this folder into .gitignore if not already, so it won't be accidentally pushed to github. Write the file report and save it to folder first, then ask user if they want to make the change. You do not need to ask permission to create the folder, but let the user know the file has been created and its name. 
+Tell the user the path, then give the headline in two or three sentences: how many findings, the worst one, and whether you'd open the PR. Don't restate the report in chat — they have the file. The report should contain both the findings and suggested fixes. Create a folder called `claudeskill_reports` in the root directory, then within it create a subfolder with the skill name — `claudeskill_reports/find-bugs/` — and write the report markdown file there. Also add `claudeskill_reports/` into .gitignore if not already, so it won't be accidentally pushed to github. Write the file report and save it to the folder first, then ask user if they want to make the change. You do not need to ask permission to create the folders, but let the user know the file has been created and its name. 
