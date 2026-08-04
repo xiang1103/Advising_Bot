@@ -2,12 +2,14 @@
 contains all backend functions used for generating & interacting with chat responses from LLM model
 '''
 import logging 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException 
 from fastapi.responses import StreamingResponse
 from backend.schema import ChatRequest
 from backend.config import INDEX_NAME, NAMESPACE 
 from backend.clients.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 from backend.agent_graph.langgraph import generate_response_stream
+from backend.db.supabase_operations import save_conversation
+from starlette.background import BackgroundTasks
 
 logger = logging.getLogger(__name__)
 # set up router for all /chat routes 
@@ -15,9 +17,19 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 
-def token_generator(request:Request, query:str,pinecone_results:list, thread_id:str):
+def persist_conversation(thread_id:int, user_message:str, bot_response:list[str]): 
     '''
-    helper function to generate tokens 
+    background job to persist the conversation into the database 
+    '''
+    if not bot_response:
+        return 
+    logger.info(f"Saving conversation to {thread_id}")
+    full_response = "".join(bot_response)
+    save_conversation(thread_id=thread_id,user_msg=user_message, bot_response=full_response)
+
+def token_generator(request:Request, query:str,pinecone_results:list, thread_id:str, sink:list):
+    '''
+    helper function to generate tokens and keep track of full response 
     '''
     try:
         for chunk in generate_response_stream(
@@ -26,17 +38,18 @@ def token_generator(request:Request, query:str,pinecone_results:list, thread_id:
             context_results=pinecone_results,
             thread_id=thread_id,
         ):
+            sink.append(chunk) 
             yield chunk
     except Exception:
-        # Streaming has already begun, so we can't change the status code.
-        # Emit a trailing marker the client can surface instead of truncating silently.
+        # when there is an error, immediately terminate 
         yield "\n\n[Advising Bot failed to finish generating this response.]"
- 
+        # partial responses are still accpeted, if the connection stops midway, so do not clear sink
 
 @router.post("")
 def chat(payload: ChatRequest, request:Request):
     '''
     given the app/advising graph as a FastAPI request and the user question, generate response with the chat model 
+    Store the chat response with a background task  
     '''
     # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
     # (the status can no longer be changed once the streaming response has started).
@@ -47,7 +60,18 @@ def chat(payload: ChatRequest, request:Request):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     logger.info("Generating Responses")
+
+    # use a shared by reference list to store all the responses, to be populated  
+    collected_convo: list[str] = [] 
+
+    # create background task for streaming response to run 
+    task_save_convo = BackgroundTasks() 
+    task_save_convo.add_task(persist_conversation,thread_id=payload.thread_id, user_message=payload.message, bot_response = collected_convo) 
+
+    # stream the response and save the conversation at the end 
     return StreamingResponse(
-        token_generator(request, query=payload.message,pinecone_results= pinecone_results, thread_id=payload.thread_id),
+        token_generator(request, query=payload.message,pinecone_results= pinecone_results, thread_id=payload.thread_id, sink=collected_convo),
         media_type="text/plain; charset=utf-8",
+        background=task_save_convo
     )
+

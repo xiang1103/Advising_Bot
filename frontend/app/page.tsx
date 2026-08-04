@@ -170,9 +170,12 @@ export default function Page() {
       // clear the pending flag in case the stream produced zero chunks.
       updateAssistant((message) => ({ ...message, pending: false }));
     } catch (error) {
+      console.error("Chat request failed: ", error)
       updateAssistant((message) => ({
         ...message,
-        content: "Advising Bot failed to generate response. Please try again!",
+        content: message.content 
+                  ? message.content + "\n\n_[Response interrupted. Please try again.]_"
+                  : "Advising Bot failed to generate response. Please try again!",
         pending: false,
       }));
     }
