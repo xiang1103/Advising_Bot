@@ -86,7 +86,7 @@ export default function Page() {
   const handleSend = async (text: string) => {
     // avoids double clicking enter when a first response is sent 
     if (streamingRef.current) return;
-    streamingRef.current = true;
+    streamingRef.current = true;  // set to one response being set 
     setIsStreaming(true);
 
     const thread = activeThread ?? startNewThread();
@@ -115,7 +115,7 @@ export default function Page() {
     // append the user's message plus an empty, pending assistant bubble (the
     // typing dots) so the UI reacts instantly before any tokens arrive.
     const assistantPlaceholder: Message = {
-      role: "assistant",
+      role: "advising_bot",
       content: "",
       pending: true,
     };
@@ -274,29 +274,29 @@ export default function Page() {
                       // safe as a key: messages are append-only, never reordered or removed
                       key={index}
                       className={`flex ${
-                        message.role === "assistant"
+                        message.role === "advising_bot"
                           ? "justify-start"
                           : "justify-end"
                       }`}
                     >
                       <div
                         className={`rounded-3xl border px-5 py-4 text-sm leading-6 shadow-sm break-words ${
-                          message.role === "assistant"
+                          message.role === "advising_bot"
                             ? "max-w-xl border-slate-200 bg-white text-slate-800"
                             : "max-w-2xl border-slate-950 user-response-bg text-white"
                         }`}
                       >
                         <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.05em] opacity-60">
-                          {message.role === "assistant" ? (
+                          {message.role === "advising_bot" ? (
                             <BookOpen className="h-3.5 w-3.5" />
                           ) : (
                             <FileText className="h-3.5 w-3.5" />
                           )}
-                          {message.role === "assistant"
+                          {message.role === "advising_bot"
                             ? "Advising Bot"
-                            : message.role}
+                            : "User"}
                         </div>
-                        {message.role === "assistant" ? (
+                        {message.role === "advising_bot" ? (
                           message.pending && message.content === "" ? (
                             <TypingDots />
                           ) : (

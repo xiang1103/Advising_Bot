@@ -9,7 +9,7 @@ type Thread = {
   };
 
 type Message = {
-role: "assistant" | "user";
+role: "advising_bot" | "user";
 content: string;
 pending?: boolean; // assistant bubble awaiting/streaming its first tokens
 };

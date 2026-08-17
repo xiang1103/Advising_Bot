@@ -16,7 +16,7 @@ export const PLACEHOLDERS = [
 export const initialMessagesByThread:Record<string, Message[]>= {
   "thread-1": [
     {
-      role: "assistant",
+      role: "advising_bot",
       content:
         "I can help map the CSE sequence, identify prerequisite chains, and point to the bulletin source that supports each recommendation.",
     },
@@ -27,14 +27,14 @@ export const initialMessagesByThread:Record<string, Message[]>= {
   ],
   "thread-2": [
     {
-      role: "assistant",
+      role: "advising_bot",
       content:
         "Send me the course code and institution, and I’ll help translate it into the likely advising outcome.",
     },
   ],
   "thread-3": [
     {
-      role: "assistant",
+      role: "advising_bot",
       content:
         "Ask about SBC categories, bulletin policies, or graduation requirements and I’ll keep the answer grounded in university sources.",
     },
