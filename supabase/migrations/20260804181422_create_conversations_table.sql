@@ -16,6 +16,6 @@ create table public.conversations(
     id      bigint generated always as identity primary key, 
     thread_id   uuid not null references public.threads(id) on delete cascade,  --- same thread id as the thread table, pinpoint to the thread's id
     role        text not null check(role in ('user', 'advising_bot')), 
-    content     text not null,
+    content     text not null,  -- the actual message content 
     created_at  timestamptz not null default clock_timestamp()  
 ); 
