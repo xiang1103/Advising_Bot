@@ -21,7 +21,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 def persist_conversation(thread_id:str, user_message:str, bot_response:list[str], ask_time:datetime): 
     '''
     background job to persist the conversation into the database 
-    '''
+    ''' 
     if not bot_response:
         return 
     logger.info(f"Saving conversation to {thread_id}")
