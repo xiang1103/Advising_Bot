@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronRight,
@@ -19,18 +19,13 @@ import {initialMessagesByThread, threads} from "@/lib/utils";
 
 
 const createThreadId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `thread-${crypto.randomUUID()}`;
-  }
-
-  return `thread-${Date.now()}`;
+    return crypto.randomUUID(); 
 };
 
 const createNewThread = (): Thread => ({
   id: createThreadId(),
   title: "New thread",
-  updatedAt: "Just now",
-  summary: "Start a new advising conversation.",
+
 });
 
 // three jumping dots shown inside an assistant bubble while awaiting the first tokens
@@ -51,6 +46,12 @@ export default function Page() {
 
   // auto set the first thread ID
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
+  // drives the disabled state of the input while a reply is streaming.
+  // the ref is the actual guard: setState is batched, so a second keypress in
+  // the same tick would still read the stale `false` from isStreaming.
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingRef = useRef(false);
 
   // define the current thread
   const activeThread = useMemo(
@@ -83,23 +84,30 @@ export default function Page() {
    * @param text - input question from user
    */
   const handleSend = async (text: string) => {
-    const threadId = activeThreadId ?? startNewThread().id;
+    // avoids double clicking enter when a first response is sent 
+    if (streamingRef.current) return;
+    streamingRef.current = true;
+    setIsStreaming(true);
+
+    const thread = activeThread ?? startNewThread();
+    const threadId = thread.id; 
     const isFirstMessage = (messagesByThread[threadId] ?? []).length === 0;
 
+    // retrieve the title. If thread already exists, we pass empty title to avoid updating/checking title 
+    const title = isFirstMessage ? text.trim().slice(0,25) : "";  
+
+    // update the title 
     if (isFirstMessage) {
       setThreadList((currentThreads) =>
-        currentThreads.map((thread) =>
-          thread.id === threadId
-            ? { ...thread, title: text.trim().slice(0, 25) }
-            : thread,
-        ),
+        currentThreads.map((t)=> (t.id === threadId ? {...t, title}:t)),  // rebuild the object title if it's the same id 
       );
     }
 
-    const assistantId = `${Date.now()}-assistant`;
+    // position the assistant bubble will occupy once both messages are appended.
+    // messages are only ever appended, so this index stays valid for the whole stream.
+    const assistantIndex = (messagesByThread[threadId] ?? []).length + 1;
 
     const userMessage: Message = {
-      id: `${Date.now()}-user`,
       role: "user",
       content: text,
     };
@@ -107,7 +115,6 @@ export default function Page() {
     // append the user's message plus an empty, pending assistant bubble (the
     // typing dots) so the UI reacts instantly before any tokens arrive.
     const assistantPlaceholder: Message = {
-      id: assistantId,
       role: "assistant",
       content: "",
       pending: true,
@@ -122,12 +129,12 @@ export default function Page() {
       ],
     }));
 
-    // apply an update to the pending assistant message (matched by id) in place.
+    // apply an update to the pending assistant message (matched by position) in place.
     const updateAssistant = (updater: (message: Message) => Message) => {
       setMessagesByThread((currentMessages) => ({
         ...currentMessages,
-        [threadId]: (currentMessages[threadId] ?? []).map((message) =>
-          message.id === assistantId ? updater(message) : message,
+        [threadId]: (currentMessages[threadId] ?? []).map((message, index) =>
+          index === assistantIndex ? updater(message) : message,
         ),
       }));
     };
@@ -141,6 +148,7 @@ export default function Page() {
         },
         body: JSON.stringify({
           thread_id: threadId,
+          thread_title: title, 
           message: text,
         }),
       });
@@ -178,6 +186,10 @@ export default function Page() {
                   : "Advising Bot failed to generate response. Please try again!",
         pending: false,
       }));
+    } finally {
+      // re-enable the input on both the success and failure paths
+      streamingRef.current = false;
+      setIsStreaming(false);
     }
   };
 
@@ -257,9 +269,10 @@ export default function Page() {
           <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8">
             <div className="h-full space-y-4">
                 {activeMessages.length > 0 ? (
-                  activeMessages.map((message) => (
+                  activeMessages.map((message, index) => (
                     <div
-                      key={message.id}
+                      // safe as a key: messages are append-only, never reordered or removed
+                      key={index}
                       className={`flex ${
                         message.role === "assistant"
                           ? "justify-start"
@@ -330,7 +343,7 @@ export default function Page() {
                 SBC advice
               </span>
             </div>
-            <AIChatInput onSend={handleSend} />
+            <AIChatInput onSend={handleSend} disabled={isStreaming} />
           </div>
 
         </section>

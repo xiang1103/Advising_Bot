@@ -16,20 +16,17 @@ export const PLACEHOLDERS = [
 export const initialMessagesByThread:Record<string, Message[]>= {
   "thread-1": [
     {
-      id: "m1",
       role: "assistant",
       content:
         "I can help map the CSE sequence, identify prerequisite chains, and point to the bulletin source that supports each recommendation.",
     },
     {
-      id: "m2",
       role: "user",
       content: "What should I take before CSE 216?",
     },
   ],
   "thread-2": [
     {
-      id: "m1",
       role: "assistant",
       content:
         "Send me the course code and institution, and I’ll help translate it into the likely advising outcome.",
@@ -37,7 +34,6 @@ export const initialMessagesByThread:Record<string, Message[]>= {
   ],
   "thread-3": [
     {
-      id: "m1",
       role: "assistant",
       content:
         "Ask about SBC categories, bulletin policies, or graduation requirements and I’ll keep the answer grounded in university sources.",
@@ -49,19 +45,13 @@ export const threads: Thread[] = [
   {
     id: "thread-1",
     title: "CSE major planning",
-    updatedAt: "2m ago",
-    summary: "Prereqs, electives, and next steps for the CS track.",
   },
   {
     id: "thread-2",
     title: "Transfer credits",
-    updatedAt: "18m ago",
-    summary: "How outside courses map to SBC requirements.",
   },
   {
     id: "thread-3",
     title: "General education",
-    updatedAt: "Yesterday",
-    summary: "HUM, SNW, and SBC learning goal questions.",
   },
 ]; 

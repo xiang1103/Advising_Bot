@@ -8,9 +8,10 @@ import { PLACEHOLDERS } from "@/lib/utils";
 
 type AIChatInputProps = {
   onSend: (text: string) => Promise<void>;
+  disabled?: boolean; // true while a reply is streaming
 };
 
-const AIChatInput = ({ onSend }: AIChatInputProps) => {
+const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -90,6 +91,8 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   };
 
   const handleSend = async () => {
+    if (disabled) return;
+
     // remove front and trailing spaces
     const text = inputValue.trimEnd().trimStart();
 
@@ -124,7 +127,8 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="w-full rounded-md border-0 bg-transparent py-2 text-base font-normal outline-none focus:outline-none focus:ring-0"
+                disabled={disabled}
+                className="w-full rounded-md border-0 bg-transparent py-2 text-base font-normal outline-none focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
                 style={{ position: "relative", zIndex: 1 }}
                 onFocus={handleActivate}
                 onKeyDown={(e) => {
@@ -169,9 +173,10 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
             </div>
 
             <button
-              className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700"
-              title="Send"
+              className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
+              title={disabled ? "Waiting for the current reply" : "Send"}
               type="button"
+              disabled={disabled}
               tabIndex={-1}
               onClick={() => {
                 void handleSend();
