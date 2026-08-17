@@ -1,5 +1,5 @@
 import os 
-import supabase 
+from datetime import datetime, timezone
 from supabase import create_client
 import logging 
 
@@ -8,19 +8,45 @@ backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SE
 logger.info("Supabase connected")
 
 
-def save_conversation(thread_id, user_msg, bot_response):
+def create_thread_table_entry(id:str, title:str):
+    '''
+    given a thread id, check if this id already exists in thread datatable or create it 
+    '''
+    if not id:
+        logger.error("Missing argument in create_thread_table_entry")
+        return 
+    row = {"id": id}
+    if title: 
+        row["title"] = title 
+    
+    try:
+        (backend_server.table("threads") 
+            .upsert(row, on_conflict="id",ignore_duplicates=True) 
+            .execute() 
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to create thread {id}: {e}")
+    
+
+def save_conversation(thread_id, user_msg, bot_response, ask_time:datetime, answer_time:datetime):
     '''
     saves the user question and bot response to the thread id in supabase 
-
-    the conversation is saved with user first, then bot. Easier for retrieval 
+    the conversation is saved with user first, then bot. Easier for retrieval
+    Need to ensure the order of insertion is correct / matches the order 
     '''
     if not thread_id or not user_msg or not bot_response:
         raise ValueError("One of the parameters is empty")
     
-    backend_server.table("conversations").insert([
-        {"thread_id": thread_id, "role": "user", "content": user_msg},
-        {"thread_id": thread_id, "role": "assistant", "content": bot_response}
-    ]).execute()     
+    # datetime to make the saving json serializable 
+    asked_iso = ask_time.astimezone(timezone.utc).isoformat()
+    answered_iso = answer_time.astimezone(timezone.utc).isoformat()
+    try:
+        backend_server.table("conversations").insert([
+            {"thread_id": thread_id, "role": "user", "content": user_msg, "created_at":asked_iso},
+            {"thread_id": thread_id, "role": "advising_bot", "content": bot_response, "created_at":answered_iso}
+        ]).execute()
+    except Exception as e: 
+        raise RuntimeError(f"Error encountered at saving conversation for thread {thread_id}: {e}")   
 
 
 def get_full_history(thread_id):
@@ -31,6 +57,7 @@ def get_full_history(thread_id):
         .select("role, content, created_at") \
         .eq("thread_id", thread_id) \
         .order("created_at") \
+        .order("id") \
         .execute().data 
 
 def get_history(thread_id, page_num=1, page_size=10): 
@@ -48,6 +75,7 @@ def get_history(thread_id, page_num=1, page_size=10):
     return backend_server.table("conversations") \
         .select("role, content, created_at") \
         .eq("thread_id", thread_id) \
-        .order("created_at") \
+        .order("created_at", desc=True) \
+        .order("id")    \
         .range(start_index, end_index) \
         .execute().data

@@ -102,7 +102,9 @@ Name the principle when one applies (SOLID, YAGNI, Law of Demeter, composition o
 
 ### 5. Write the report
 
-Write to `critiques/YYYY-MM-DD-<scope>-critique.md` at the repository root, creating the directory if needed. `<scope>` is a short slug for what was reviewed — the branch name, the feature, or the top-level folder (e.g. `critiques/2026-07-23-auth-refactor-critique.md`). Never overwrite an existing critique; append `-2` if the name is taken, so the user keeps the history.
+Create a folder called `claudeskill_reports` at the repository root, then within it a subfolder named for this skill — `claudeskill_reports/critique-me/`. Create both if they don't exist, and add `claudeskill_reports/` to `.gitignore` if it isn't already there.
+
+Write to `claudeskill_reports/critique-me/YYYY-MM-DD-<scope>-critique.md`. `<scope>` is a short slug for what was reviewed — the branch name, the feature, or the top-level folder (e.g. `claudeskill_reports/critique-me/2026-07-23-auth-refactor-critique.md`). Never overwrite an existing critique; append `-2` if the name is taken, so the user keeps the history.
 
 Tell the user the path when you're done, and give them a 3-4 sentence summary in chat — the headline finding and the overall verdict. Don't paste the whole report into the conversation; the file is the deliverable.
 
@@ -210,4 +212,4 @@ If everything is Major, nothing is. A review with fifteen findings and no rankin
 Match depth to what's in front of you. A 60-line utility module gets a short report; a new service with five modules and a migration earns the full treatment. Length signals importance — a long document about a small change teaches the user to stop reading these.
 
 ## After Writing Report 
-The report should contain both the findings and your suggestions. Write the report markdown file inside critique-me-reports folder in the root directory. Also add this folder into .gitignore if not already, so it won't be accidentally pushed to github. Write the file report and save it to folder first, then ask user if they want to make the change. You do not need to ask permission to create the folder, but let the user know the file has been created and its name. 
+The report should contain both the findings and your suggestions. Create a folder called `claudeskill_reports` in the root directory, then within it create a subfolder with the skill name — `claudeskill_reports/critique-me/` — and write the report markdown file there. Also add `claudeskill_reports/` into .gitignore if not already, so it won't be accidentally pushed to github. Write the file report and save it to the folder first, then ask user if they want to make the change. You do not need to ask permission to create the folders, but let the user know the file has been created and its name. 

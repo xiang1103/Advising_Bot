@@ -11,7 +11,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from backend.agent_graph.langgraph import build_advising_graph
 from backend.clients.llm.gemini import create_model
 from backend.config import GEMINI_MODEL 
-from backend.routers import chat 
+from backend.routers import chat
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# include different endpoint routers 
 app.include_router(chat.router)
+
 
 
 @app.get("/health")
