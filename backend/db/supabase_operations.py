@@ -8,6 +8,25 @@ backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SE
 logger.info("Supabase connected")
 
 
+def create_thread_table_entry(id:str, title:str):
+    '''
+    given a thread id, check if this id already exists in thread datatable or create it 
+    '''
+    if not id:
+        logger.error("Missing argument in create_thread_table_entry")
+        return 
+    row = {"id": id}
+    if title: 
+        row["title"] = title 
+    
+    try:
+        (backend_server.table("threads") 
+            .upsert(row, on_conflict="id",ignore_duplicates=True) 
+            .execute() 
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to create thread {id}: {e}")
+    
 
 def save_conversation(thread_id, user_msg, bot_response, ask_time:datetime, answer_time:datetime):
     '''

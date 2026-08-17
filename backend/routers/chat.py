@@ -9,7 +9,7 @@ from backend.schema import ChatRequest
 from backend.config import INDEX_NAME, NAMESPACE, TIMEZONE 
 from backend.clients.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 from backend.agent_graph.langgraph import generate_response_stream
-from backend.db.supabase_operations import save_conversation
+from backend.db.supabase_operations import save_conversation, create_thread_table_entry
 from starlette.background import BackgroundTasks
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,8 @@ def chat(payload: ChatRequest, request:Request):
     thread_id = str(payload.thread_id)   
     thread_title = payload.thread_title 
 
-    # TODO: create thread table to make sure conversation table is linked with thread  
+    # create thread table to make sure conversation table is linked with thread  
+    create_thread_table_entry(thread_id, thread_title)
 
     user_message = payload.message 
     
