@@ -17,7 +17,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 
-def persist_conversation(thread_id:int, user_message:str, bot_response:list[str]): 
+def persist_conversation(thread_id:str, user_message:str, bot_response:list[str]): 
     '''
     background job to persist the conversation into the database 
     '''
@@ -64,13 +64,18 @@ def chat(payload: ChatRequest, request:Request):
     # use a shared by reference list to store all the responses, to be populated  
     collected_convo: list[str] = [] 
 
+    # convert back into string from UUID 
+    thread_id = str(payload.thread_id)   
+    thread_title = payload.thread_title 
+    user_message = payload.message 
+    
     # create background task for streaming response to run 
     task_save_convo = BackgroundTasks() 
-    task_save_convo.add_task(persist_conversation,thread_id=payload.thread_id, user_message=payload.message, bot_response = collected_convo) 
+    task_save_convo.add_task(persist_conversation,thread_id=thread_id, user_message=user_message, bot_response = collected_convo) 
 
     # stream the response and save the conversation at the end 
     return StreamingResponse(
-        token_generator(request, query=payload.message,pinecone_results= pinecone_results, thread_id=payload.thread_id, sink=collected_convo),
+        token_generator(request, query=user_message,pinecone_results= pinecone_results, thread_id=thread_id, sink=collected_convo),
         media_type="text/plain; charset=utf-8",
         background=task_save_convo
     )

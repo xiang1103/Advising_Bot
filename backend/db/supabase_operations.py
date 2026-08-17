@@ -8,6 +8,7 @@ backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SE
 logger.info("Supabase connected")
 
 
+
 def save_conversation(thread_id, user_msg, bot_response):
     '''
     saves the user question and bot response to the thread id in supabase 
@@ -19,7 +20,7 @@ def save_conversation(thread_id, user_msg, bot_response):
     try: 
         backend_server.table("conversations").insert([
             {"thread_id": thread_id, "role": "user", "content": user_msg},
-            {"thread_id": thread_id, "role": "assistant", "content": bot_response}
+            {"thread_id": thread_id, "role": "advising_bot", "content": bot_response}
         ]).execute()  
     except Exception as e: 
         raise RuntimeError(f"Error encountered at saving conversation for thread {thread_id}: {e}")   
@@ -33,6 +34,7 @@ def get_full_history(thread_id):
         .select("role, content, created_at") \
         .eq("thread_id", thread_id) \
         .order("created_at") \
+        .order("id") \
         .execute().data 
 
 def get_history(thread_id, page_num=1, page_size=10): 
