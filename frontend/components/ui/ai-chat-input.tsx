@@ -5,22 +5,16 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, Paperclip, Send, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@radix-ui/react-dropdown-menu";
-
-const PLACEHOLDERS = [
-  "What's my graduation requirement?",
-  "What classes to take?",
-  "What is the meaning of life?",
-  "What is the best class to take?",
-  "How to cook a delicious schedule?",
-];
+import { PLACEHOLDERS } from "@/lib/utils";
 
 type Model = "gemini" | "qwen"
 
 type AIChatInputProps = {
   onSend: (text: string, model: Model) => Promise<void>;
+  disabled?: boolean; // true while a reply is streaming
 };
 
-const AIChatInput = ({ onSend }: AIChatInputProps) => {
+const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -102,6 +96,8 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
   };
 
   const handleSend = async () => {
+    if (disabled) return;
+
     // remove front and trailing spaces
     const text = inputValue.trimEnd().trimStart();
 
@@ -136,7 +132,8 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="w-full rounded-md border-0 bg-transparent py-2 text-base font-normal outline-none focus:outline-none focus:ring-0"
+                disabled={disabled}
+                className="w-full rounded-md border-0 bg-transparent py-2 text-base font-normal outline-none focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
                 style={{ position: "relative", zIndex: 1 }}
                 onFocus={handleActivate}
                 onKeyDown={(e) => {
@@ -206,9 +203,10 @@ const AIChatInput = ({ onSend }: AIChatInputProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
             <button
-              className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700"
-              title="Send"
+              className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
+              title={disabled ? "Waiting for the current reply" : "Send"}
               type="button"
+              disabled={disabled}
               tabIndex={-1}
               onClick={() => {
                 void handleSend();

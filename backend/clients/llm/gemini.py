@@ -1,13 +1,12 @@
 '''
-LLM provider factory - constructs the chat model used by the LangGraph workflow
+Gemini API 
 '''
-import os
-
-from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
+import os 
 
 load_dotenv()
-gemini_key = os.getenv("Gemini_key")
+gemini_key = os.getenv("GEMINI_KEY")
 
 def create_model(gemini_model: str = "gemini-3-flash-preview"):
     model = ChatGoogleGenerativeAI(

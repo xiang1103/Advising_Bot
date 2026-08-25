@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronRight,
@@ -13,74 +13,19 @@ import {
 } from "lucide-react";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
 import { MarkdownMessage } from "@/components/ui/markdown-message";
-import {Session, Message} from "@/lib/types";
+import {Thread, Message} from "@/lib/types";
+import {initialMessagesByThread, threads} from "@/lib/utils"; 
 
-const sessions: Session[] = [
-  {
-    id: "session-1",
-    title: "CSE major planning",
-    updatedAt: "2m ago",
-    summary: "Prereqs, electives, and next steps for the CS track.",
-  },
-  {
-    id: "session-2",
-    title: "Transfer credits",
-    updatedAt: "18m ago",
-    summary: "How outside courses map to SBC requirements.",
-  },
-  {
-    id: "session-3",
-    title: "General education",
-    updatedAt: "Yesterday",
-    summary: "HUM, SNW, and SBC learning goal questions.",
-  },
-];
 
-const initialMessagesBySession: Record<string, Message[]> = {
-  "session-1": [
-    {
-      id: "m1",
-      role: "assistant",
-      content:
-        "I can help map the CSE sequence, identify prerequisite chains, and point to the bulletin source that supports each recommendation.",
-    },
-    {
-      id: "m2",
-      role: "user",
-      content: "What should I take before CSE 216?",
-    },
-  ],
-  "session-2": [
-    {
-      id: "m1",
-      role: "assistant",
-      content:
-        "Send me the course code and institution, and I’ll help translate it into the likely advising outcome.",
-    },
-  ],
-  "session-3": [
-    {
-      id: "m1",
-      role: "assistant",
-      content:
-        "Ask about SBC categories, bulletin policies, or graduation requirements and I’ll keep the answer grounded in university sources.",
-    },
-  ],
+
+const createThreadId = () => {
+    return crypto.randomUUID(); 
 };
 
-const createSessionId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `session-${crypto.randomUUID()}`;
-  }
+const createNewThread = (): Thread => ({
+  id: createThreadId(),
+  title: "New thread",
 
-  return `session-${Date.now()}`;
-};
-
-const createNewSession = (): Session => ({
-  id: createSessionId(),
-  title: "New session",
-  updatedAt: "Just now",
-  summary: "Start a new advising conversation.",
 });
 
 // three jumping dots shown inside an assistant bubble while awaiting the first tokens
@@ -94,38 +39,44 @@ const TypingDots = () => (
 
 export default function Page() {
   // hard coded variables for starters
-  const [sessionList, setSessionList] = useState<Session[]>(sessions);
-  const [messagesBySession, setMessagesBySession] = useState<
+  const [threadList, setThreadList] = useState<Thread[]>(threads);
+  const [messagesByThread, setMessagesByThread] = useState<
     Record<string, Message[]>
-  >(initialMessagesBySession);
+  >(initialMessagesByThread);
 
-  // auto set the first session ID
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // auto set the first thread ID
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
-  // define the current session
-  const activeSession = useMemo(
+  // drives the disabled state of the input while a reply is streaming.
+  // the ref is the actual guard: setState is batched, so a second keypress in
+  // the same tick would still read the stale `false` from isStreaming.
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingRef = useRef(false);
+
+  // define the current thread
+  const activeThread = useMemo(
     () =>
-      sessionList.find((session) => session.id === activeSessionId),
-    [activeSessionId, sessionList],
+      threadList.find((thread) => thread.id === activeThreadId),
+    [activeThreadId, threadList],
   );
 
-  const activeMessages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
+  const activeMessages = activeThreadId ? messagesByThread[activeThreadId] ?? [] : [];
 
-  const startNewSession = (): Session => {
-    const newSession = createNewSession();
+  const startNewThread = (): Thread => {
+    const newThread = createNewThread();
 
-    setSessionList((currentSessions) => [newSession, ...currentSessions]);
-    setMessagesBySession((currentMessages) => ({
+    setThreadList((currentThreads) => [newThread, ...currentThreads]);
+    setMessagesByThread((currentMessages) => ({
       ...currentMessages,
-      [newSession.id]: [],
+      [newThread.id]: [],
     }));
-    setActiveSessionId(newSession.id);
+    setActiveThreadId(newThread.id);
 
-    return newSession;
+    return newThread;
   };
 
-  const handleNewSession = () => {
-    startNewSession();
+  const handleNewThread = () => {
+    startNewThread();
   };
 
   /**
@@ -133,23 +84,30 @@ export default function Page() {
    * @param text - input question from user
    */
   const handleSend = async (text: string, model: "gemini" | "qwen") => {
-    const sessionId = activeSessionId ?? startNewSession().id;
-    const isFirstMessage = (messagesBySession[sessionId] ?? []).length === 0;
+    // avoids double clicking enter when a first response is sent
+    if (streamingRef.current) return;
+    streamingRef.current = true;  // set to one response being set
+    setIsStreaming(true);
 
+    const thread = activeThread ?? startNewThread();
+    const threadId = thread.id; 
+    const isFirstMessage = (messagesByThread[threadId] ?? []).length === 0;
+
+    // retrieve the title. If thread already exists, we pass empty title to avoid updating/checking title 
+    const title = isFirstMessage ? text.trim().slice(0,25) : "";  
+
+    // update the title 
     if (isFirstMessage) {
-      setSessionList((currentSessions) =>
-        currentSessions.map((session) =>
-          session.id === sessionId
-            ? { ...session, title: text.trim().slice(0, 25) }
-            : session,
-        ),
+      setThreadList((currentThreads) =>
+        currentThreads.map((t)=> (t.id === threadId ? {...t, title}:t)),  // rebuild the object title if it's the same id 
       );
     }
 
-    const assistantId = `${Date.now()}-assistant`;
+    // position the assistant bubble will occupy once both messages are appended.
+    // messages are only ever appended, so this index stays valid for the whole stream.
+    const assistantIndex = (messagesByThread[threadId] ?? []).length + 1;
 
     const userMessage: Message = {
-      id: `${Date.now()}-user`,
       role: "user",
       content: text,
     };
@@ -157,31 +115,31 @@ export default function Page() {
     // append the user's message plus an empty, pending assistant bubble (the
     // typing dots) so the UI reacts instantly before any tokens arrive.
     const assistantPlaceholder: Message = {
-      id: assistantId,
-      role: "assistant",
+      role: "advising_bot",
       content: "",
       pending: true,
     };
 
-    setMessagesBySession((currentMessages) => ({
+    setMessagesByThread((currentMessages) => ({
       ...currentMessages,
-      [sessionId]: [
-        ...(currentMessages[sessionId] ?? []),
+      [threadId]: [
+        ...(currentMessages[threadId] ?? []),
         userMessage,
         assistantPlaceholder,
       ],
     }));
 
-    // apply an update to the pending assistant message (matched by id) in place.
+    // apply an update to the pending assistant message (matched by position) in place.
     const updateAssistant = (updater: (message: Message) => Message) => {
-      setMessagesBySession((currentMessages) => ({
+      setMessagesByThread((currentMessages) => ({
         ...currentMessages,
-        [sessionId]: (currentMessages[sessionId] ?? []).map((message) =>
-          message.id === assistantId ? updater(message) : message,
+        [threadId]: (currentMessages[threadId] ?? []).map((message, index) =>
+          index === assistantIndex ? updater(message) : message,
         ),
       }));
     };
 
+    // calling backend function for response back 
     try {
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
@@ -189,7 +147,8 @@ export default function Page() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          session_id: sessionId,
+          thread_id: threadId,
+          thread_title: title, 
           message: text,
           model,
         }),
@@ -220,11 +179,18 @@ export default function Page() {
       // clear the pending flag in case the stream produced zero chunks.
       updateAssistant((message) => ({ ...message, pending: false }));
     } catch (error) {
+      console.error("Chat request failed: ", error)
       updateAssistant((message) => ({
         ...message,
-        content: "Advising Bot failed to generate response. Please try again!",
+        content: message.content 
+                  ? message.content + "\n\n_[Response interrupted. Please try again.]_"
+                  : "Advising Bot failed to generate response. Please try again!",
         pending: false,
       }));
+    } finally {
+      // re-enable the input on both the success and failure paths
+      streamingRef.current = false;
+      setIsStreaming(false);
     }
   };
 
@@ -237,7 +203,7 @@ export default function Page() {
           {/* logo — click to return to the home page */}
           <button
             type="button"
-            onClick={() => setActiveSessionId(null)}
+            onClick={() => setActiveThreadId(null)}
             className="flex items-center gap-3 rounded-2xl text-left transition hover:opacity-80"
             title="Go to home page"
           >
@@ -254,22 +220,22 @@ export default function Page() {
 
           <button
             className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-            onClick={handleNewSession}
+            onClick={handleNewThread}
             type="button"
           >
             <Plus className="h-4 w-4" />
-            New session
+            New thread
           </button>
 
-          {/* displays all sessions on the left side  */}
+          {/* displays all threads on the left side  */}
           <div className="mt-6 flex-1 overflow-y-auto pr-1">
             <div className="space-y-3">
-              {sessionList.map((session) => {
-                const isActive = session.id === activeSessionId;
+              {threadList.map((thread) => {
+                const isActive = thread.id === activeThreadId;
                 return (
                   <button
-                    key={session.id}
-                    onClick={() => setActiveSessionId(session.id)}
+                    key={thread.id}
+                    onClick={() => setActiveThreadId(thread.id)}
                     className={`w-full rounded-3xl border p-4 text-left transition ${
                       isActive
                         ? "border-amber-300 bg-white text-slate-950"
@@ -278,7 +244,7 @@ export default function Page() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold">{session.title}</p>
+                        <p className="font-semibold">{thread.title}</p>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
                     </div>
@@ -295,7 +261,7 @@ export default function Page() {
           <header className="flex items-center justify-center border-b border-slate-200/80 px-5 py-4 md:px-8">
             <div>
               <h2 className="mt-1 text-2xl  text-slate-950 text-center">
-                {activeSession?.title ?? "New Chat"}
+                {activeThread?.title ?? "New Chat"}
               </h2>
             </div>
           </header>
@@ -304,33 +270,34 @@ export default function Page() {
           <div className="flex-1 overflow-y-auto px-5 py-6 md:px-8">
             <div className="h-full space-y-4">
                 {activeMessages.length > 0 ? (
-                  activeMessages.map((message) => (
+                  activeMessages.map((message, index) => (
                     <div
-                      key={message.id}
+                      // safe as a key: messages are append-only, never reordered or removed
+                      key={index}
                       className={`flex ${
-                        message.role === "assistant"
+                        message.role === "advising_bot"
                           ? "justify-start"
                           : "justify-end"
                       }`}
                     >
                       <div
                         className={`rounded-3xl border px-5 py-4 text-sm leading-6 shadow-sm break-words ${
-                          message.role === "assistant"
+                          message.role === "advising_bot"
                             ? "max-w-xl border-slate-200 bg-white text-slate-800"
                             : "max-w-2xl border-slate-950 user-response-bg text-white"
                         }`}
                       >
                         <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.05em] opacity-60">
-                          {message.role === "assistant" ? (
+                          {message.role === "advising_bot" ? (
                             <BookOpen className="h-3.5 w-3.5" />
                           ) : (
                             <FileText className="h-3.5 w-3.5" />
                           )}
-                          {message.role === "assistant"
+                          {message.role === "advising_bot"
                             ? "Advising Bot"
-                            : message.role}
+                            : "User"}
                         </div>
-                        {message.role === "assistant" ? (
+                        {message.role === "advising_bot" ? (
                           message.pending && message.content === "" ? (
                             <TypingDots />
                           ) : (
@@ -353,7 +320,7 @@ export default function Page() {
                       </h3>
                       <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
                         Ask about course prerequisites, degree progress, or transfer
-                        credits. Your first message starts a new session.
+                        credits. Your first message starts a new thread.
                       </p>
                     </div>
                   </div>
@@ -377,7 +344,7 @@ export default function Page() {
                 SBC advice
               </span>
             </div>
-            <AIChatInput onSend={handleSend} />
+            <AIChatInput onSend={handleSend} disabled={isStreaming} />
           </div>
 
         </section>
