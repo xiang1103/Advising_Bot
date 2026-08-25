@@ -1,32 +1,32 @@
 import os 
 from datetime import datetime, timezone
 from supabase import create_client
-import logging 
+from backend.db.error_handler import db_operation
+import logging
 
 logger= logging.getLogger(__name__)
 backend_server = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 logger.info("Supabase connected")
 
 
+# --- operations ------------------------------------------------------------
+
 def create_thread_table_entry(id:str, title:str):
     '''
     given a thread id, check if this id already exists in thread datatable or create it 
     '''
     if not id:
-        logger.error("Missing argument in create_thread_table_entry")
-        return 
+        raise ValueError("create_thread_table_entry requires a thread id")
     row = {"id": id}
     if title: 
         row["title"] = title 
-    
-    try:
+
+    with db_operation("create_thread_table_entry"):
         (backend_server.table("threads") 
             .upsert(row, on_conflict="id",ignore_duplicates=True) 
             .execute() 
         )
-    except Exception as e:
-        raise RuntimeError(f"Failed to create thread {id}: {e}")
-    
+
 
 def save_conversation(thread_id, user_msg, bot_response, ask_time:datetime, answer_time:datetime):
     '''
@@ -40,25 +40,27 @@ def save_conversation(thread_id, user_msg, bot_response, ask_time:datetime, answ
     # datetime to make the saving json serializable 
     asked_iso = ask_time.astimezone(timezone.utc).isoformat()
     answered_iso = answer_time.astimezone(timezone.utc).isoformat()
-    try:
+
+    with db_operation("save_conversation"):
         backend_server.table("conversations").insert([
             {"thread_id": thread_id, "role": "user", "content": user_msg, "created_at":asked_iso},
             {"thread_id": thread_id, "role": "advising_bot", "content": bot_response, "created_at":answered_iso}
         ]).execute()
-    except Exception as e: 
-        raise RuntimeError(f"Error encountered at saving conversation for thread {thread_id}: {e}")   
 
 
-def get_full_history(thread_id):
-    ''' 
-    return the full history without pagination 
+def list_all_threads(limit=50): 
     '''
-    return backend_server.table("conversations") \
-        .select("role, content, created_at") \
-        .eq("thread_id", thread_id) \
-        .order("created_at") \
-        .order("id") \
-        .execute().data 
+    return all the threads in the threads table fo the database, returning as json 
+    ''' 
+    with db_operation("list_all_threads"):
+        return (
+            backend_server.table("threads")
+                .select("id, title")
+                .order("updated_at", desc=True)
+                .limit(limit)
+                .execute().data
+        )
+
 
 def get_history(thread_id, page_num=1, page_size=10): 
     ''' 
@@ -69,13 +71,19 @@ def get_history(thread_id, page_num=1, page_size=10):
         num_messages: number of messages to show  
     
     '''
+    # caught here rather than on the wire: a page_num below 1 becomes a negative
+    # OFFSET, which postgres rejects with a 400 after a full round trip
+    if page_num < 1 or page_size < 1:
+        raise ValueError("page_num and page_size must be >= 1")
+
     start_index =  (page_num-1) * page_size 
     end_index = start_index + page_size-1 
 
-    return backend_server.table("conversations") \
-        .select("role, content, created_at") \
-        .eq("thread_id", thread_id) \
-        .order("created_at", desc=True) \
-        .order("id")    \
-        .range(start_index, end_index) \
-        .execute().data
+    with db_operation("get_history"):
+        return backend_server.table("conversations") \
+            .select("role, content, created_at") \
+            .eq("thread_id", thread_id) \
+            .order("created_at", desc=True) \
+            .order("id")    \
+            .range(start_index, end_index) \
+            .execute().data

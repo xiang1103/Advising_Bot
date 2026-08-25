@@ -29,8 +29,11 @@ def persist_conversation(thread_id:str, user_message:str, bot_response:list[str]
 
     # capture answer time to record bot response 
     answered_at = datetime.now(TIMEZONE)
-    save_conversation(thread_id=thread_id,user_msg=user_message, bot_response=full_response, ask_time=ask_time, answer_time=answered_at)
-
+    try: 
+        save_conversation(thread_id=thread_id,user_msg=user_message, bot_response=full_response, ask_time=ask_time, answer_time=answered_at)
+    except Exception:
+        logger.exception(f"Conversation failed to save for thread {thread_id}")
+        
 def token_generator(request:Request, query:str,pinecone_results:list, thread_id:str, sink:list):
     '''
     helper function to generate tokens and keep track of full response 
