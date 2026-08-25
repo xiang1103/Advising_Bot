@@ -132,7 +132,7 @@ export default function Page() {
    * Send question to generate response and store into db
    * @param text - input question from user
    */
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, model: "gemini" | "qwen") => {
     const sessionId = activeSessionId ?? startNewSession().id;
     const isFirstMessage = (messagesBySession[sessionId] ?? []).length === 0;
 
@@ -191,6 +191,7 @@ export default function Page() {
         body: JSON.stringify({
           session_id: sessionId,
           message: text,
+          model,
         }),
       });
 

@@ -7,7 +7,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langgraph.checkpoint.postgres import PostgresSaver
 
-from backend.src.gemini import build_advising_graph, create_model, generate_response_stream
+from backend.llm.factory import create_model
+from backend.llm.graph import build_advising_graph, generate_response_stream
 from backend.pinecone_utility.pinecone_driver import get_pc_index, pc_search, retrieve_topk_text
 
 MODEL = create_model()
