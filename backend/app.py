@@ -1,5 +1,5 @@
 '''
-entry point program that runs from top to bottom, variable app is imported 
+entry point program that runs from top to bottom, variable app is imported
 '''
 
 import os
@@ -9,8 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres import PostgresSaver
 from backend.agent_graph.langgraph import build_advising_graph
-from backend.clients.llm.gemini import create_model
-from backend.config import GEMINI_MODEL 
+from backend.clients.llm.factory import create_model
 from backend.routers import chat
 
 logger = logging.getLogger(__name__)
@@ -25,9 +24,9 @@ async def lifespan(app: FastAPI):
             "LANGGRAPH_CHECKPOINT_URL environment variable is required to enable LangGraph's Postgres checkpointing."
         )
 
-    # create the model 
-    model = create_model(GEMINI_MODEL)
-    logger.info(f"Model created: {GEMINI_MODEL}")
+    # create the model
+    model = create_model()
+    logger.info(f"Model created: {type(model).__name__}")
     # Adapter that opens the Postgres connection and keeps it alive for the app lifespan.
     with PostgresSaver.from_conn_string(db_url) as checkpointer:
         checkpointer.setup()
@@ -38,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# allow front end to send HTTP requests over to backend 
+# allow front end to send HTTP requests over to backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
@@ -48,7 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# include different endpoint routers 
+# include different endpoint routers
 app.include_router(chat.router)
 
 
