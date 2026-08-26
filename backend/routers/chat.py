@@ -80,7 +80,8 @@ def chat(payload: ChatRequest, request:Request):
     thread_id = str(payload.thread_id)   
     thread_title = payload.thread_title 
 
-    # create thread table to make sure conversation table is linked with thread  
+    # create thread table to make sure conversation table is linked with thread 
+    # this function will be caught by the middleware in the API  
     create_thread_table_entry(thread_id, thread_title)
 
     user_message = payload.message 

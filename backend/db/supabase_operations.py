@@ -1,7 +1,7 @@
 import os 
 from datetime import datetime, timezone
 from supabase import create_client
-from backend.db.error_handler import db_operation
+from backend.db.error_handler import db_operation, DatabaseRequestError 
 import logging
 
 logger= logging.getLogger(__name__)
@@ -16,7 +16,7 @@ def create_thread_table_entry(id:str, title:str):
     given a thread id, check if this id already exists in thread datatable or create it 
     '''
     if not id:
-        raise ValueError("create_thread_table_entry requires a thread id")
+        raise DatabaseRequestError(operation="create_thread_table_entry requires a thread id")
     row = {"id": id}
     if title: 
         row["title"] = title 
