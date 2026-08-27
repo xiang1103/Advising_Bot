@@ -2,12 +2,15 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
-import { Mic, Paperclip, Send } from "lucide-react";
+import { Mic, Paperclip, Send, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@radix-ui/react-dropdown-menu";
 import { PLACEHOLDERS } from "@/lib/utils";
 
+type Model = "gemini" | "qwen"
+
 type AIChatInputProps = {
-  onSend: (text: string) => Promise<void>;
+  onSend: (text: string, model: Model) => Promise<void>;
   disabled?: boolean; // true while a reply is streaming
 };
 
@@ -16,6 +19,8 @@ const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [model, setModel] = useState<"gemini" | "qwen">("gemini")
+
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -101,7 +106,7 @@ const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
     // clear the input immediately so it doesn't linger while awaiting the backend
     setInputValue("");
     setIsActive(false);
-    await onSend(text);
+    await onSend(text, model);
   };
 
   return (
@@ -171,7 +176,32 @@ const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
                 </AnimatePresence>
               </div>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 rounded-md px-2 py-2 text-sm text-gray-600 transition hover:bg-gray-100"
+                  title="Select AI model"
+                >
+                  {model === "gemini" ? "Gemini" : "Qwen"}
+                  <ChevronDown size={16} />
+                </button>
+              </DropdownMenuTrigger>
 
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setModel("gemini")}
+                >
+                  Gemini
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setModel("qwen")}
+                >
+                  Qwen (Local)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               className="flex items-center justify-center rounded-full bg-black p-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
               title={disabled ? "Waiting for the current reply" : "Send"}

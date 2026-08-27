@@ -83,10 +83,10 @@ export default function Page() {
    * Send question to generate response and store into db
    * @param text - input question from user
    */
-  const handleSend = async (text: string) => {
-    // avoids double clicking enter when a first response is sent 
+  const handleSend = async (text: string, model: "gemini" | "qwen") => {
+    // avoids double clicking enter when a first response is sent
     if (streamingRef.current) return;
-    streamingRef.current = true;  // set to one response being set 
+    streamingRef.current = true;  // set to one response being set
     setIsStreaming(true);
 
     const thread = activeThread ?? startNewThread();
@@ -150,6 +150,7 @@ export default function Page() {
           thread_id: threadId,
           thread_title: title, 
           message: text,
+          model,
         }),
       });
 

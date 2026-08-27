@@ -1,5 +1,5 @@
 '''
-entry point program that runs from top to bottom, variable app is imported 
+entry point program that runs from top to bottom, variable app is imported
 '''
 
 import os
@@ -31,9 +31,9 @@ async def lifespan(app: FastAPI):
             "LANGGRAPH_CHECKPOINT_URL environment variable is required to enable LangGraph's Postgres checkpointing."
         )
 
-    # create the model 
-    model = create_model(GEMINI_MODEL)
-    logger.info(f"Model created: {GEMINI_MODEL}")
+    # create the model
+    model = create_model()
+    logger.info(f"Model created: {type(model).__name__}")
     # Adapter that opens the Postgres connection and keeps it alive for the app lifespan.
     with PostgresSaver.from_conn_string(db_url) as checkpointer:
         checkpointer.setup()
