@@ -29,8 +29,11 @@ def persist_conversation(thread_id:str, user_message:str, bot_response:list[str]
 
     # capture answer time to record bot response 
     answered_at = datetime.now(TIMEZONE)
-    save_conversation(thread_id=thread_id,user_msg=user_message, bot_response=full_response, ask_time=ask_time, answer_time=answered_at)
-
+    try: 
+        save_conversation(thread_id=thread_id,user_msg=user_message, bot_response=full_response, ask_time=ask_time, answer_time=answered_at)
+    except Exception:
+        logger.exception(f"Conversation failed to save for thread {thread_id}")
+        
 def token_generator(request:Request, query:str,pinecone_results:list, thread_id:str, sink:list):
     '''
     helper function to generate tokens and keep track of full response 
@@ -61,13 +64,14 @@ def chat(payload: ChatRequest, request:Request):
     asked_at = datetime.now(TIMEZONE) 
 
     # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
-    # (the status can no longer be changed once the streaming response has started).
+    # (the status can no longer be changed once the streaming response has started)
+    # do not raise directly here, otherwise the exception will go to the front end 
     try:
         index = get_pc_index(INDEX_NAME)
         results = pc_search(index, NAMESPACE, payload.message, top_k=5)
         pinecone_results = retrieve_topk_text(results, top_k=5)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Failed to extract factual information for model")
     logger.info("Generating Responses")
 
     # use a shared by reference list to store all the responses, to be populated  
@@ -77,7 +81,8 @@ def chat(payload: ChatRequest, request:Request):
     thread_id = str(payload.thread_id)   
     thread_title = payload.thread_title 
 
-    # create thread table to make sure conversation table is linked with thread  
+    # create thread table to make sure conversation table is linked with thread 
+    # this function will be caught by the middleware in the API  
     create_thread_table_entry(thread_id, thread_title)
 
     user_message = payload.message 
