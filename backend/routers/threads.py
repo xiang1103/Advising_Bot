@@ -17,4 +17,7 @@ def get_all_threads():
     router function for retrieving all threads for display 
     (actual content/history) is retrieved at other functions -> lazy eval
     '''
-    pass 
+    try: 
+        ()
+    except Exception as e: 
+        pass  

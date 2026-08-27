@@ -44,7 +44,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+
+# add catch other exceptions 
+@app.middleware("http") 
+async def catch_unexpected_exceptions(request:Request, call_next):
+    '''
+    catches exception and manually turn it into a json response 
+    '''
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception(f"Unexpected error on {request.method} at {request.url.path}")
+        return JSONResponse(status_code=500, content={"detail": "Internal Error on Unexpected Exception"})
+
+
 # allow front end to send HTTP requests over to backend 
+# all errors raissed by CORS wouldn't propogate down the program 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
@@ -59,12 +74,13 @@ app.add_middleware(
 # become HTTP. Ordering matters: FastAPI dispatches on the exact class, so the
 # subclasses are registered alongside the base rather than relying on it
 
+# these error handling catches error that happen at handling request level
+
 def _db_failure(status: int, detail: str, exc: DatabaseError) -> JSONResponse:
     logger.error(
         "%s failed (code=%s): %s", exc.operation, exc.code, exc, exc_info=exc
     )
     return JSONResponse(status_code=status, content={"detail": detail})
-
 
 @app.exception_handler(DatabaseUnavailable)
 async def handle_db_unavailable(request: Request, exc: DatabaseUnavailable):
@@ -82,6 +98,7 @@ async def handle_db_request_error(request: Request, exc: DatabaseRequestError):
 async def handle_db_error(request: Request, exc: DatabaseError):
     # our bug or misconfiguration: never leak the driver message to the client
     return _db_failure(500, "Internal error.", exc)
+
 
 
 # include different endpoint routers 

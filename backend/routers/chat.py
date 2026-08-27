@@ -64,13 +64,14 @@ def chat(payload: ChatRequest, request:Request):
     asked_at = datetime.now(TIMEZONE) 
 
     # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
-    # (the status can no longer be changed once the streaming response has started).
+    # (the status can no longer be changed once the streaming response has started)
+    # do not raise directly here, otherwise the exception will go to the front end 
     try:
         index = get_pc_index(INDEX_NAME)
         results = pc_search(index, NAMESPACE, payload.message, top_k=5)
         pinecone_results = retrieve_topk_text(results, top_k=5)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Failed to extract factual information for model")
     logger.info("Generating Responses")
 
     # use a shared by reference list to store all the responses, to be populated  
