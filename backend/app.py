@@ -5,12 +5,19 @@ entry point program that runs from top to bottom, variable app is imported
 import os
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from langgraph.checkpoint.postgres import PostgresSaver
 from backend.agent_graph.langgraph import build_advising_graph
-from backend.clients.llm.factory import create_model
-from backend.routers import chat
+from backend.clients.llm.gemini import create_model
+from backend.config import GEMINI_MODEL 
+from backend.db.error_handler import (
+    DatabaseError,
+    DatabaseRequestError,
+    DatabaseUnavailable,
+)
+from backend.routers import chat, threads
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +44,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# allow front end to send HTTP requests over to backend
+
+# add catch other exceptions 
+@app.middleware("http") 
+async def catch_unexpected_exceptions(request:Request, call_next):
+    '''
+    catches exception and manually turn it into a json response 
+    '''
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception(f"Unexpected error on {request.method} at {request.url.path}")
+        return JSONResponse(status_code=500, content={"detail": "Internal Error on Unexpected Exception"})
+
+
+# allow front end to send HTTP requests over to backend 
+# all errors raissed by CORS wouldn't propogate down the program 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
@@ -47,8 +69,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# include different endpoint routers
+# --- error boundary --------------------------------------------------------
+# The db layer raises semantic exceptions; this is the single place where they
+# become HTTP. Ordering matters: FastAPI dispatches on the exact class, so the
+# subclasses are registered alongside the base rather than relying on it
+
+# these error handling catches error that happen at handling request level
+
+def _db_failure(status: int, detail: str, exc: DatabaseError) -> JSONResponse:
+    logger.error(
+        "%s failed (code=%s): %s", exc.operation, exc.code, exc, exc_info=exc
+    )
+    return JSONResponse(status_code=status, content={"detail": detail})
+
+@app.exception_handler(DatabaseUnavailable)
+async def handle_db_unavailable(request: Request, exc: DatabaseUnavailable):
+    # transient: tell the frontend a retry is worth attempting
+    return _db_failure(503, "Database temporarily unavailable, please try again.", exc)
+
+
+@app.exception_handler(DatabaseRequestError)
+async def handle_db_request_error(request: Request, exc: DatabaseRequestError):
+    # the request itself was rejected, retrying it unchanged will not help
+    return _db_failure(400, "Invalid request for this conversation.", exc)
+
+
+@app.exception_handler(DatabaseError)
+async def handle_db_error(request: Request, exc: DatabaseError):
+    # our bug or misconfiguration: never leak the driver message to the client
+    return _db_failure(500, "Internal error.", exc)
+
+
+
+# include different endpoint routers 
 app.include_router(chat.router)
+app.include_router(threads.router)
 
 
 

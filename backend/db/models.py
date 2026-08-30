@@ -1,3 +1,0 @@
-'''
-database schemas for storage
-'''
