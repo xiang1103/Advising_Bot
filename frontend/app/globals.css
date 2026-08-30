@@ -59,7 +59,8 @@ select {
 }
 
 .user-response-bg {
-  background-color: #a5a58d ;
+  background-color: #F0F0F0 ;
+  color: black;
 }
 
 .sidebar-bg {

@@ -4,10 +4,23 @@ import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Mic, Paperclip, Send, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@radix-ui/react-dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PLACEHOLDERS } from "@/lib/utils";
 
 type Model = "gemini" | "qwen"
+
+const MODELS: Array<{ value: Model; label: string; hint: string }> = [
+  { value: "gemini", label: "Gemini", hint: "Cloud" },
+  { value: "qwen", label: "Qwen", hint: "Local" },
+];
 
 type AIChatInputProps = {
   onSend: (text: string, model: Model) => Promise<void>;
@@ -180,26 +193,33 @@ const AIChatInput = ({ onSend, disabled = false }: AIChatInputProps) => {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-1 rounded-md px-2 py-2 text-sm text-gray-600 transition hover:bg-gray-100"
+                  className="group flex items-center gap-1 rounded-md px-2 py-2 text-sm text-gray-600 transition hover:bg-gray-100 data-[state=open]:bg-gray-100"
                   title="Select AI model"
                 >
-                  {model === "gemini" ? "Gemini" : "Qwen"}
-                  <ChevronDown size={16} />
+                  {MODELS.find((m) => m.value === model)?.label}
+                  <ChevronDown
+                    size={16}
+                    className="transition-transform duration-200 group-data-[state=open]:rotate-180"
+                  />
                 </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setModel("gemini")}
+              <DropdownMenuContent align="end" sideOffset={8} className="w-52">
+                <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
+                  Model
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                  value={model}
+                  onValueChange={(value) => setModel(value as Model)}
                 >
-                  Gemini
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={() => setModel("qwen")}
-                >
-                  Qwen (Local)
-                </DropdownMenuItem>
+                  {MODELS.map(({ value, label, hint }) => (
+                    <DropdownMenuRadioItem key={value} value={value}>
+                      <span className="flex-1">{label}</span>
+                      <span className="text-xs text-muted-foreground">{hint}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
             <button
