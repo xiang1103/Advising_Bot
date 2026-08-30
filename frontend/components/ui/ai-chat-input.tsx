@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
-import { Mic, Paperclip, Send, ChevronDown } from "lucide-react";
+import { Send, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import {
   DropdownMenu,
