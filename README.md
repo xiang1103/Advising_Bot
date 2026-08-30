@@ -10,9 +10,11 @@ Want to know about course work details? Why going through static webpages like t
 `npm install`
 `npm run dev`
 
-Start another terminal, stay in project directory, 
+Start another terminal, stay in project directory,
 
 Run: ```python -m uvicorn backend.app:app --reload --port 8000```
+
+If using Local Model, run `ollama serve` to launch ollama on port 11434.
 
 
 ## 🚀 Overview
@@ -47,15 +49,15 @@ Because the system relies on vector-based similarity search (Pinecone) rather th
 *Built by SBU Undergrads, for SBU Undergrads.*
 
 
-## Dependencies 
+## Dependencies
 ```
 pip install langgraph-checkpoint-postgres
 pip install supabase
 ```
-Mac: ```brew install supabase/tap/supabase```  
-Windows: 
-```scoop bucket add supabase https://github.com/supabase/scoop-bucket.git```  
+Mac: ```brew install supabase/tap/supabase```
+Windows:
+```scoop bucket add supabase https://github.com/supabase/scoop-bucket.git```
 
-```scoop install supabase ``` 
+```scoop install supabase ```
 
 If want to do deployment with Supabase, download Docker Desktop [here](https://docs.docker.com/desktop/setup/install/mac-install/)
