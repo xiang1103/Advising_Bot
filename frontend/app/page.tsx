@@ -14,8 +14,7 @@ import {
 import { AIChatInput } from "@/components/ui/ai-chat-input";
 import { MarkdownMessage } from "@/components/ui/markdown-message";
 import {Thread, Message} from "@/lib/types";
-import {initialMessagesByThread} from "@/lib/utils"; 
-import { fetchThreads } from "@/lib/api/threads";
+import { fetchThreads, fetchThreadMessages } from "@/lib/api/threads";
 
 
 
@@ -26,7 +25,6 @@ const createThreadId = () => {
 const createNewThread = (): Thread => ({
   id: createThreadId(),
   title: "New thread",
-
 });
 
 // three jumping dots shown inside an assistant bubble while awaiting the first tokens
@@ -42,13 +40,22 @@ export default function Page() {
   // create threads 
   const [threadList, setThreadList] = useState<Thread[]>([]);
 
-  useEffect(()=> {
-    fetchThreads().then(setThreadList); 
-  }, []); 
+  // the sidebar is network-backed now, so it has a real pending state on first
+  // paint. Without it an empty list renders as "no conversations" for a beat
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
 
+  useEffect(()=> {
+    fetchThreads()
+      .then(setThreadList)
+      .finally(() => setIsLoadingThreads(false));
+  }, []);
+
+  // starts empty and stays a cache, never a seed: a missing key means "not
+  // fetched yet" and is what openThread keys its lazy load off. Pre-filling it
+  // would make those threads look loaded and silently skip the request
   const [messagesByThread, setMessagesByThread] = useState<
     Record<string, Message[]>
-  >(initialMessagesByThread);
+  >({});
 
   // auto set the first thread ID
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -59,6 +66,14 @@ export default function Page() {
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingRef = useRef(false);
 
+  // the thread whose history is currently in flight, so the chat pane can show
+  // dots instead of flashing the welcome screen at an already-used thread
+  const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
+
+  // same reason the streaming guard is a ref: a second click lands before the
+  // loadingThreadId setState has been applied, and would fire a duplicate request
+  const inFlightThreadsRef = useRef<Set<string>>(new Set());
+
   // define the current thread
   const activeThread = useMemo(
     () =>
@@ -67,6 +82,8 @@ export default function Page() {
   );
 
   const activeMessages = activeThreadId ? messagesByThread[activeThreadId] ?? [] : [];
+
+  const isLoadingHistory = activeThreadId !== null && loadingThreadId === activeThreadId;
 
   const startNewThread = (): Thread => {
     const newThread = createNewThread();
@@ -83,6 +100,48 @@ export default function Page() {
 
   const handleNewThread = () => {
     startNewThread();
+  };
+
+  /**
+   * Select a thread and lazily pull its conversation history the first time
+   * it is opened.
+   * @param threadId - id of the clicked thread, as stored in the db
+   */
+  const openThread = async (threadId: string) => {
+    // switch immediately: the fetch must never delay the highlight or the header
+    setActiveThreadId(threadId);
+
+    // an existing entry means the history is already here. Covers three cases:
+    // a thread fetched earlier, one created locally by startNewThread, and one
+    // currently streaming. Refetching the last would clobber the live reply
+    if (messagesByThread[threadId] !== undefined) return;
+    if (inFlightThreadsRef.current.has(threadId)) return;
+
+    inFlightThreadsRef.current.add(threadId);
+    setLoadingThreadId(threadId);
+
+    try {
+      const history = await fetchThreadMessages(threadId);
+
+      // null is a failed request, distinct from a thread with no messages.
+      // leaving the key unset means the next click retries instead of caching
+      // an empty conversation forever
+      if (history) {
+        setMessagesByThread((currentMessages) =>
+          // re-check inside the updater: handleSend may have started writing
+          // into this thread while the request was in flight, and that local
+          // state is newer than what the server just handed back
+          currentMessages[threadId] !== undefined
+            ? currentMessages
+            : { ...currentMessages, [threadId]: history },
+        );
+      }
+    } finally {
+      inFlightThreadsRef.current.delete(threadId);
+      // only clear if we are still the pending one: a later click on another
+      // thread owns the indicator now
+      setLoadingThreadId((current) => (current === threadId ? null : current));
+    }
   };
 
   /**
@@ -236,12 +295,19 @@ export default function Page() {
           {/* displays all threads on the left side  */}
           <div className="mt-6 flex-1 overflow-y-auto pr-1">
             <div className="space-y-3">
-              {threadList.map((thread) => {
+              {isLoadingThreads ? (
+                <p className="px-1 text-sm text-slate-400">Loading threads…</p>
+              ) : threadList.length === 0 ? (
+                <p className="px-1 text-sm text-slate-400">
+                  No conversations yet. Start one to see it here.
+                </p>
+              ) : (
+                threadList.map((thread) => {
                 const isActive = thread.id === activeThreadId;
                 return (
                   <button
                     key={thread.id}
-                    onClick={() => setActiveThreadId(thread.id)}
+                    onClick={() => openThread(thread.id)}
                     className={`w-full rounded-3xl border p-4 text-left transition ${
                       isActive
                         ? "border-amber-300 bg-white text-slate-950"
@@ -256,7 +322,8 @@ export default function Page() {
                     </div>
                   </button>
                 );
-              })}
+                })
+              )}
             </div>
           </div>
         </aside>
@@ -315,6 +382,12 @@ export default function Page() {
                       </div>
                     </div>
                   ))
+                ) : isLoadingHistory ? (
+                  // a previously used thread is not empty, it is just not here
+                  // yet: the welcome screen would be wrong for the whole request
+                  <div className="flex h-full items-center justify-center">
+                    <TypingDots />
+                  </div>
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400 text-slate-950">
@@ -350,7 +423,14 @@ export default function Page() {
                 SBC advice
               </span>
             </div>
-            <AIChatInput onSend={handleSend} disabled={isStreaming} />
+            {/* also blocked while history loads: sending into a thread whose
+                past messages are still in flight makes handleSend read an empty
+                array, so it treats an old thread as brand new (retitling it) and
+                openThread then drops the history it fetched */}
+            <AIChatInput
+              onSend={handleSend}
+              disabled={isStreaming || isLoadingHistory}
+            />
           </div>
 
         </section>

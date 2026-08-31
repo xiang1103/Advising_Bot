@@ -61,6 +61,21 @@ def list_all_threads(limit=50):
                 .execute().data
         )
 
+def retrieve_thread_conversation(thread_id:str):
+    '''
+    retrieve all conversation history from conversations table given the thread id
+    ordered oldest first, which is the order the frontend renders bubbles in
+    '''
+    with db_operation("retrieve_thread_conversation"):
+        return (
+            backend_server.table("conversations")
+                .select("id, role, content")
+                .eq("thread_id", thread_id)
+                .order("created_at")
+                .order("id")
+                .execute().data
+        )
+
 
 def get_history(thread_id, page_num=1, page_size=10): 
     ''' 

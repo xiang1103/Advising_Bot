@@ -14,4 +14,6 @@ content: string;
 pending?: boolean; // assistant bubble awaiting/streaming its first tokens
 };
 
-export type {Thread, Message}; 
+type ConversationBlock = Message & { id: number };
+
+export type {Thread, Message,ConversationBlock }; 
