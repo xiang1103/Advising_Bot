@@ -9,3 +9,7 @@ class ChatRequest(BaseModel):
     thread_id: UUID     # convert str into valid UUID 
     thread_title: str
     message: str
+
+class ThreadSummary(BaseModel): 
+    id: UUID
+    title: str 

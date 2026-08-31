@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronRight,
@@ -14,7 +14,8 @@ import {
 import { AIChatInput } from "@/components/ui/ai-chat-input";
 import { MarkdownMessage } from "@/components/ui/markdown-message";
 import {Thread, Message} from "@/lib/types";
-import {initialMessagesByThread, threads} from "@/lib/utils"; 
+import {initialMessagesByThread} from "@/lib/utils"; 
+import { fetchThreads } from "@/lib/api/threads";
 
 
 
@@ -38,8 +39,13 @@ const TypingDots = () => (
 );
 
 export default function Page() {
-  // hard coded variables for starters
-  const [threadList, setThreadList] = useState<Thread[]>(threads);
+  // create threads 
+  const [threadList, setThreadList] = useState<Thread[]>([]);
+
+  useEffect(()=> {
+    fetchThreads().then(setThreadList); 
+  }, []); 
+
   const [messagesByThread, setMessagesByThread] = useState<
     Record<string, Message[]>
   >(initialMessagesByThread);
