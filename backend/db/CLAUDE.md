@@ -142,45 +142,21 @@ browser never talks to PostgREST.
 
 ## Schema
 
-Defined in `supabase/migrations/`, applied with `supabase db reset`.
+**`supabase/CLAUDE.md` owns the DDL, the migration list, and the grants.** Go
+there to change the schema. What matters on this side of the boundary:
 
-```sql
-threads(
-  id uuid primary key,                      -- minted in the BROWSER, not here
-  title text not null default 'New Conversation',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()   -- no touch trigger
-)
-
-conversations(
-  id bigint generated always as identity primary key,
-  thread_id uuid not null references threads(id) on delete cascade,
-  role text not null check (role in ('user','advising_bot')),
-  content text not null,
-  created_at timestamptz not null default clock_timestamp()
-)
-```
-
-Two traps already paid for once:
-
-- **Grants are not automatic.** Tables created by migration have no Data API
-  grants, and every backend write fails with
-  `permission denied for table threads (42501)`. The remote project does not hit
-  this only because its tables were made by hand in the dashboard, which grants
-  automatically. `20260825180158_grant_data_api_access.sql` fixes it.
-  **Any new table needs `grant select, insert, update, delete … to service_role`
-  in its own migration.** `anon` and `authenticated` are deliberately granted
-  nothing.
-- **RLS is enabled on both tables** and `service_role` bypasses it, so it is
-  free for the backend today. It exists so the tables stay closed by default if
-  `anon`/`authenticated` are ever granted access. Revisit only alongside real
-  policies.
-
-`role` values must stay in sync across three places: the SQL `CHECK`, the
-`Literal["user","advising_bot"]` in `backend/schema.py`, and the union in
-`frontend/lib/types.ts`.
-
----
+- **`threads.id` is a client-generated UUID** with no server-side default — the
+  browser is the allocator, and Postgres implicitly casts the string the backend
+  sends.
+- **`conversations.id` is a bigint identity**, and doubles as the ordering
+  tiebreak within a turn (see the invariants above).
+- **`role` is constrained by a SQL `CHECK`** whose values must match
+  `backend/schema.py` and `frontend/lib/types.ts`.
+- **Deleting a thread cascades to its messages** — but not to the LangGraph
+  checkpoint, which is a separate store.
+- **The service role key bypasses RLS**, so the policies (there are none) never
+  apply to this layer. A table reachable from here needs an explicit grant in
+  its migration; a new table without one fails every write.
 
 ## Adding an operation
 

@@ -4,36 +4,26 @@ Serves the chat API, runs the RAG + LangGraph pipeline, and owns all database
 access. Read the root `CLAUDE.md` first for the system-level picture — in
 particular the *two independent persistence systems* section.
 
-**This file covers what spans the whole backend.** Per-directory detail lives in
-the nested files below, which are authoritative for their own area; keep facts
-in exactly one of them.
+**This file covers what spans the whole backend:** the composition root, the
+layering rules, and the invariants that hold across layers. Anything specific to
+one area lives in that area's file, which is authoritative for it.
 
 | Directory | File | Owns |
 |---|---|---|
 | `routers/` | [`routers/CLAUDE.md`](routers/CLAUDE.md) | endpoints, the `/chat` lifecycle, the streaming contract |
 | `agent_graph/` | [`agent_graph/CLAUDE.md`](agent_graph/CLAUDE.md) | graph state, nodes, prompt, summarisation, checkpointing |
-| `db/` | [`db/CLAUDE.md`](db/CLAUDE.md) | operations, exception classification, schema, migrations |
+| `db/` | [`db/CLAUDE.md`](db/CLAUDE.md) | operations, exception classification, table invariants |
 | `clients/` | [`clients/CLAUDE.md`](clients/CLAUDE.md) | Pinecone adapter |
 | `clients/llm/` | [`clients/llm/CLAUDE.md`](clients/llm/CLAUDE.md) | provider factory |
 | `tests/` | [`tests/CLAUDE.md`](tests/CLAUDE.md) | the integration suite and its safety guards |
 
----
-
-## ⚠️ Maintaining these files
-
-**Update the affected `CLAUDE.md` in the same commit as the code.** These files
-are the only durable memory future sessions have; a stale one is worse than a
-missing one because it is trusted.
-
-Put each fact in the **nearest** file that owns it. Something spanning two
-directories (a layering rule, an ordering constraint between layers) belongs
-here; something spanning backend and frontend belongs in the root file. When you
-fix an item under any "Known issues"/"Known bugs" list, **delete the entry** —
-do not leave it marked resolved.
+Keep each fact in exactly one file. See the scope rule in the root `CLAUDE.md`.
 
 ---
 
 ## Top-level modules
+
+These four have no subdirectory of their own, so this file owns them.
 
 ```
 backend/
@@ -43,20 +33,19 @@ backend/
 └── utils.py      setup_logging()
 ```
 
-- **`app.py` is the only place that wires things together.** It resolves
-  `LANGGRAPH_CHECKPOINT_URL` (raising `RuntimeError` if unset), builds the model,
-  opens the `PostgresSaver`, compiles the graph onto `app.state.advising_app`,
-  registers middleware and exception handlers, includes the routers, and exposes
-  `GET /health`.
+- **`app.py` is the only place that wires things together**, and the only place
+  that knows about every other layer. It resolves `LANGGRAPH_CHECKPOINT_URL`
+  (raising `RuntimeError` if unset), builds the model, opens the
+  `PostgresSaver`, compiles the graph onto `app.state.advising_app`, registers
+  middleware and exception handlers, includes the routers, and exposes
+  `GET /health`. Nothing else should reach across layers like this.
 - **`config.py` holds constants only.** No I/O, no clients, no env reads.
-- **`schema.py` is a shared contract.** `ChatRequest`, `ThreadSummary`,
-  `ConversationBlock`. Change it and `frontend/lib/types.ts` together. The
-  `Literal["user","advising_bot"]` on `ConversationBlock.role` must also match
-  the SQL `CHECK` constraint.
-- **`utils.setup_logging(verbose=False)`** configures the root logger with
-  `force=True` and silences `httpx`/`httpcore`. Note the docstring says
-  DEBUG/WARNING but the code uses INFO/ERROR — and **nothing currently calls
-  it**, so the service runs on Python's default logging config.
+- **`schema.py` is a shared contract**, not just backend types — see the root
+  `CLAUDE.md` for the frontend and SQL counterparts it must agree with.
+- **`utils.setup_logging(verbose=False)`** configures the root logger and
+  silences `httpx`/`httpcore`. **Nothing calls it**, so the service currently
+  runs on Python's default logging config; its docstring also disagrees with its
+  code (DEBUG/WARNING vs. INFO/ERROR).
 
 ---
 
@@ -72,83 +61,74 @@ routers  ──►  db/supabase_operations  ──►  db/error_handler
                                     app.py exception handlers ──► HTTP status
 ```
 
-1. **`db/` never decides HTTP status codes.** It raises `DatabaseError`,
-   `DatabaseUnavailable`, or `DatabaseRequestError`, which describe *what kind*
-   of failure happened. That keeps the module usable from scripts and tests with
-   no web layer. The classification table lives in `db/CLAUDE.md`.
-2. **`app.py` is the single place those become HTTP** (503 / 400 / 500).
-   Handlers are registered for all three classes **explicitly**, because FastAPI
-   dispatches on the exact class rather than walking the MRO — registering only
-   the base would leave the subclasses unhandled. Driver messages are logged,
-   never returned to the client.
+1. **`db/` never decides HTTP status codes.** It raises exceptions that describe
+   *what kind* of failure happened — transient, bad request, or our bug — not
+   what status to send. That keeps the module usable from scripts and tests with
+   no web layer.
+2. **`app.py` is the single place those become HTTP.** One handler per exception
+   class, registered explicitly.
 3. **Routers must not catch `DatabaseError`.** Swallowing it flattens a
-   retryable 503 into an indistinguishable 500 and the frontend stops retrying.
-   `threads.py::get_thread_messages` is the model to follow;
-   `get_all_threads` is older code that does not.
+   retryable failure into an indistinguishable 500 and the frontend stops
+   retrying.
 4. **`clients/` and `agent_graph/` know nothing about HTTP or the database.**
    They take plain arguments and return plain data.
 5. **Everything imports absolutely** (`from backend.config import ...`), so the
-   repo root must be the import root. Run uvicorn from the repo root;
-   `pytest.ini` sets `pythonpath = .` to match.
+   repo root must be the import root — for uvicorn and for pytest alike.
 
-### Error-handling layers, outermost first
+### The error boundary
+
+Failures are classified once, in `db/`, and translated once, in `app.py`:
 
 | Layer | Catches | Result |
 |---|---|---|
 | `catch_unexpected_exceptions` HTTP middleware | anything that escapes a route | generic JSON 500, logged |
-| `@app.exception_handler(DatabaseUnavailable)` | transient DB failure | 503 "please try again" |
+| `@app.exception_handler(DatabaseUnavailable)` | transient DB failure | 503 |
 | `@app.exception_handler(DatabaseRequestError)` | rejected request | 400 |
-| `@app.exception_handler(DatabaseError)` | our bug / misconfiguration | 500 "Internal error." |
+| `@app.exception_handler(DatabaseError)` | our bug / misconfiguration | 500 |
 
-CORS is a separate middleware; errors it raises do not reach
-`catch_unexpected_exceptions`. Origins are restricted by
-`allow_origin_regex` to `localhost`/`127.0.0.1` on any port, with
-`allow_origins` intentionally empty.
+Two things about this that are easy to get wrong: handlers must be registered
+for **all three classes explicitly**, because FastAPI dispatches on the exact
+class rather than walking the MRO; and driver messages are logged, never
+returned to the client. The signal-to-exception mapping is in
+`db/CLAUDE.md`.
+
+CORS is a separate middleware, so errors it raises never reach the
+`catch_unexpected_exceptions` boundary.
 
 ---
 
-## Cross-cutting facts worth knowing before you edit anything
+## Invariants that hold across layers
 
-- **Several modules read `os.getenv` at import time, not call time** —
-  `db/supabase_operations.py` (the Supabase client itself),
-  `clients/pinecone_driver.py`, `clients/llm/factory.py` (`GEMINI_KEY`). Setting
-  an env var after importing the module has no effect. This is why
-  `tests/conftest.py` is built the way it is.
-- **Startup is expensive and happens once.** The model is created and the graph
-  compiled in the lifespan, inside the `with PostgresSaver...` block that must
-  stay open for the process lifetime. There is no per-request model selection
-  seam.
+Each is enforced or explained in the file that owns it; they are listed here
+because breaking one from a different layer is the realistic failure mode.
+
+- **Startup happens once and is expensive.** The model is created and the graph
+  compiled during the lifespan, inside a `PostgresSaver` context that must stay
+  open for the process lifetime. There is no per-request model-selection seam.
 - **Once a streaming response starts, the status code is fixed.** Every fallible
-  step on `/chat` must run before the `StreamingResponse` is returned. See
-  `routers/CLAUDE.md`.
+  step on `/chat` must run before the response is returned.
 - **The thread UUID is minted in the browser** and is the same value in
-  `threads.id`, `conversations.thread_id`, and the LangGraph checkpoint's
-  `configurable.thread_id`. Never derive, prefix, or transform it.
-- **FK ordering:** `create_thread_table_entry` before `save_conversation`,
-  always.
+  `threads.id`, `conversations.thread_id`, and the LangGraph checkpoint config.
+  Never derive, prefix, or transform it.
+- **Thread row before message rows.** `conversations.thread_id` is a foreign
+  key, so `create_thread_table_entry` must precede `save_conversation`.
+- **Several modules read `os.getenv` at import time**, not call time — the
+  Supabase client is built during import. This is why the test suite sets the
+  environment before importing anything and imports lazily through a fixture.
 
 ---
 
-## Known bugs (delete the entry when fixed)
+## Known issues
 
-Cross-cutting index; area-specific issues are listed in the nested files.
+Area-specific issues are listed at the bottom of each nested file. These belong
+to the modules this file owns:
 
 1. **`app.py:13` imports a module that does not exist.**
-   `from backend.clients.llm.gemini import create_model` — `clients/llm/gemini.py`
-   was deleted in commit `44be6f7`; the replacement is
-   `backend/clients/llm/factory.py` (which `agent_graph/langgraph.py` already
-   imports correctly). **The server cannot start until this is fixed.** A stale
-   `__pycache__/gemini.cpython-312.pyc` is on disk but Python will not import
-   from it without the source.
-2. **`ChatRequest` has no `model` field** while the frontend sends one, so the
-   UI's provider dropdown is silently ignored. Honouring it requires a
-   per-request model seam that does not exist yet — see
-   `clients/llm/CLAUDE.md`.
-3. **`utils.setup_logging()` is never called**, so none of the logging config —
-   the format string, the `httpx` silencing — is in effect. `app.py` should call
-   it during startup.
-4. **`app.py` imports `GEMINI_MODEL` from `config` but never uses it.** Harmless,
-   but remove it when fixing (1), since it reinforces the wrong idea that
-   `app.py` picks the model.
-5. **`routers/threads.py::get_all_threads` flattens the semantic error layer** —
-   see rule 3 above.
+   `from backend.clients.llm.gemini import create_model` — that module was
+   deleted when the provider factory was introduced. **The server cannot start
+   until this is fixed.** Background in `clients/llm/CLAUDE.md`.
+2. **`utils.setup_logging()` is never called**, so none of the logging
+   configuration is in effect. `app.py` should call it during startup.
+3. **`app.py` imports `GEMINI_MODEL` but never uses it.** Harmless, but remove
+   it when fixing (1) — it reinforces the wrong idea that `app.py` picks the
+   model.

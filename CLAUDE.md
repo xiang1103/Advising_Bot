@@ -5,36 +5,44 @@ backend that answers questions by retrieving bulletin text from Pinecone (RAG)
 and streaming a reply from an LLM orchestrated by LangGraph, while persisting
 the conversation to Supabase Postgres.
 
+**This file is the system-level map.** It covers how the pieces fit together and
+anything that spans frontend↔backend. Per-area detail lives in the nested
+`CLAUDE.md` files — go there before editing code in that area.
+
 ---
 
-## ⚠️ Maintaining this file
+## ⚠️ Maintaining these files
 
 **Every code change must update the `CLAUDE.md` files it invalidates, in the
 same commit as the code.** These files are the only durable memory future
 sessions have; a stale one is worse than a missing one because it is trusted.
 
-Update the relevant `CLAUDE.md` when you:
+Update one when you:
 
 - add, delete, move, or rename a module, route, table, or column;
 - change a contract between layers (request/response shape, exception types,
   ordering guarantees, who is allowed to catch what);
 - fix or introduce an edge case that is not obvious from reading the code;
 - change how the app is run, configured, or tested;
-- resolve one of the "Known drift" items below — delete the entry, don't leave it.
+- resolve a listed known issue — **delete the entry**, don't mark it fixed.
 
-Scope rule: put a fact in the **nearest** `CLAUDE.md` that owns it. Cross-cutting
-architecture and anything spanning frontend↔backend belongs here in the root
-file. Backend internals belong in the nested backend files:
+**Scope rule: put each fact in the nearest file that owns it, and only there.**
+Duplicating a detail up the tree is how these files go stale — the copy gets
+missed and then contradicts the code. This file stays general; the children
+carry specifics.
 
-- `backend/CLAUDE.md` — hub: layering rules, error-handling layers, cross-cutting invariants
-- `backend/routers/CLAUDE.md` — endpoints, `/chat` lifecycle, streaming contract
-- `backend/agent_graph/CLAUDE.md` — graph state, nodes, summarisation, checkpointing
-- `backend/db/CLAUDE.md` — operations, exception classification, schema and migrations
-- `backend/clients/CLAUDE.md` — Pinecone adapter
-- `backend/clients/llm/CLAUDE.md` — LLM provider factory
-- `backend/tests/CLAUDE.md` — the integration suite and its safety guards
-- `supabase/CLAUDE.md` — migrations, schema, grants, local stack config
-- `ingestion/CLAUDE.md` — scraper, cleaning rules, Pinecone upsert
+| File | Owns |
+|---|---|
+| `CLAUDE.md` (here) | system architecture, layout, how to run it, environment, frontend↔backend contract |
+| `backend/CLAUDE.md` | backend layering rules, composition root, cross-layer invariants |
+| `backend/routers/CLAUDE.md` | endpoints, the `/chat` lifecycle, the streaming contract |
+| `backend/agent_graph/CLAUDE.md` | graph state, nodes, prompt, summarisation, checkpointing |
+| `backend/db/CLAUDE.md` | db operations, exception classification, table invariants |
+| `backend/clients/CLAUDE.md` | Pinecone adapter |
+| `backend/clients/llm/CLAUDE.md` | LLM provider factory |
+| `backend/tests/CLAUDE.md` | the integration suite and its safety guards |
+| `supabase/CLAUDE.md` | migrations, DDL, grants, local stack config |
+| `ingestion/CLAUDE.md` | scraper, cleaning rules, Pinecone upsert |
 
 `frontend/` has no `CLAUDE.md` yet; facts about it live here until it does.
 
@@ -56,6 +64,10 @@ file. Backend internals belong in the nested backend files:
    └── Supabase client (backend/db)       → Postgres  (threads / conversations tables)
 ```
 
+A request is: retrieve context → stream a reply → persist the turn in the
+background. The corpus behind the retrieval step is built offline and separately
+(`ingestion/`); nothing in that pipeline runs at request time.
+
 ### Two independent persistence systems — the single most important thing to know
 
 The same conversation is stored **twice**, by two systems that do not know about
@@ -65,22 +77,21 @@ each other:
 |---|---|---|
 | Written by | `PostgresSaver` inside the graph | `backend/db/supabase_operations.py` |
 | Connects via | `LANGGRAPH_CHECKPOINT_URL` (raw Postgres) | `SUPABASE_URL` + service role key (PostgREST) |
-| Purpose | what the *model* sees as memory (with summarisation) | what the *user* sees as history in the UI |
+| Purpose | what the *model* sees as memory | what the *user* sees as history in the UI |
 | Keyed by | `config.configurable.thread_id` | `threads.id` / `conversations.thread_id` |
 
-They share the **same thread UUID**, generated in the browser
-(`crypto.randomUUID()` in `frontend/app/page.tsx`), which is what keeps them
-aligned. Consequences to keep in mind:
+They stay aligned only because they share the **same thread UUID**, generated in
+the browser. Consequences:
 
-- These two stores can and do diverge. Persistence to the app tables happens in
-  a background task *after* the stream ends; if it fails, the model still
-  remembers the turn but the UI will not show it after a reload.
-- LangGraph *summarises and deletes* old messages (see `backend/CLAUDE.md`), so
-  the checkpoint is deliberately lossy. The `conversations` table is the
-  complete record. Never treat one as a backup of the other.
-- Deleting a row from `threads` cascades to `conversations` but leaves the
-  LangGraph checkpoint rows orphaned. Any future "delete thread" feature must
-  clear both.
+- **They can diverge.** Persistence to the app tables happens in a background
+  task after the stream ends; if it fails, the model still remembers the turn
+  but the UI will not show it after a reload.
+- **The checkpoint is deliberately lossy** — LangGraph summarises and deletes
+  old messages. The `conversations` table is the complete record. Neither is a
+  backup of the other.
+- **Deletes only cascade on one side.** Removing a `threads` row cascades to
+  `conversations` but orphans the checkpoint rows. A delete-thread feature must
+  clear both stores.
 
 ---
 
@@ -88,10 +99,10 @@ aligned. Consequences to keep in mind:
 
 | Path | What lives there |
 |---|---|
-| `backend/` | FastAPI app, routers, LangGraph agent, db layer, clients. See `backend/CLAUDE.md`. |
+| `backend/` | FastAPI app, routers, LangGraph agent, db layer, clients → `backend/CLAUDE.md` |
 | `frontend/` | Next.js 16 App Router + React 19 + Tailwind. Single-page chat UI. |
-| `ingestion/` | Offline scripts: bulletin scraper → CSV → Pinecone upsert. Not imported by the server at runtime. See `ingestion/CLAUDE.md`. |
-| `supabase/` | Supabase CLI project: `config.toml` and the SQL migrations that define `threads` / `conversations`. See `supabase/CLAUDE.md`. |
+| `ingestion/` | Offline corpus pipeline: scraper → CSV → Pinecone → `ingestion/CLAUDE.md` |
+| `supabase/` | CLI project: local stack config and the SQL migrations → `supabase/CLAUDE.md` |
 | `data/` | Scraped CSVs. Gitignored. |
 | `pytest.ini` | Sets `pythonpath = .` and `testpaths = backend/tests`. |
 
@@ -108,6 +119,9 @@ python -m uvicorn backend.app:app --reload --port 8000
 
 # optional — local model
 ollama serve            # port 11434, then set LLM_PROVIDER=ollama
+
+# tests — needs Docker
+supabase start && supabase db reset && pytest
 ```
 
 **Always run the backend from the repo root.** Every backend module imports
@@ -120,34 +134,28 @@ import root. `pytest.ini` sets `pythonpath = .` to reproduce this for tests.
 |---|---|---|
 | `PINECONE_KEY` | `backend/clients/pinecone_driver.py` | read at import time |
 | `GEMINI_KEY` | `backend/clients/llm/factory.py` | read at import time |
-| `LLM_PROVIDER` | `backend/clients/llm/factory.py` | `gemini` (default) or `ollama` |
+| `LLM_PROVIDER` | `backend/clients/llm/factory.py` | `gemini` (default) or `ollama`; read per call |
 | `SUPABASE_URL` | `backend/db/supabase_operations.py` | read at import time |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/db/supabase_operations.py` | backend is the only writer; bypasses RLS |
 | `LANGGRAPH_CHECKPOINT_URL` | `backend/app.py` lifespan | **hard requirement** — startup raises `RuntimeError` without it |
+| `SUPABASE_ACCESS_TOKEN` | `supabase` CLI | or use `supabase login` |
 
-Several modules read `os.getenv` at *import* time, not call time. Setting an env
-var after importing the module has no effect — this is why
-`backend/tests/conftest.py` goes to such lengths to set the environment before
-importing `backend.db.supabase_operations`.
+"Read at import time" means setting the variable after importing that module has
+no effect. See `backend/CLAUDE.md` for why this shapes the test setup.
 
 ---
 
 ## Database
 
-Schema lives in `supabase/migrations/`, applied with `supabase db reset`.
-`supabase/CLAUDE.md` is authoritative for the DDL, the migration list, the
-local-stack config, and the workflow; `backend/db/CLAUDE.md` covers how the
-application uses the tables.
+`supabase/CLAUDE.md` owns the DDL, migrations, grants, and local-stack workflow.
+`backend/db/CLAUDE.md` owns how the application uses the tables.
 
-The two facts that bite hardest, repeated here because they cross layers:
+Architecturally: two tables, `threads` (one row per conversation, id minted in
+the browser) and `conversations` (one row per message, `ON DELETE CASCADE` from
+its thread). The backend is the only client — it connects with the service role
+key and bypasses RLS; the browser never talks to PostgREST.
 
-- **Grants are not automatic.** A table created by migration has no Supabase
-  Data API grants, and every backend write fails with
-  `permission denied for table threads (42501)`. Any new table needs an explicit
-  `grant … to service_role` in its own migration. The remote project does not
-  hit this only because its tables were made by hand in the dashboard.
-- **`threads.updated_at` has no touch trigger.** Nothing writes it, yet
-  `list_all_threads` orders by it, so the sidebar is ordered by creation time.
+---
 
 ## Frontend ↔ backend contract
 
@@ -159,39 +167,33 @@ The two facts that bite hardest, repeated here because they cross layers:
 | `Message { role, content, pending? }` | — (`pending` is client-only) |
 | `ConversationBlock = Message & { id: number }` | `ConversationBlock` |
 
-- `POST /chat` returns `text/plain` **raw token chunks**, not SSE and not JSON.
-  There is no framing, so the client just concatenates. Do not add a JSON
-  envelope without updating the reader loop in `frontend/app/page.tsx`.
-- The backend URL is hardcoded to `http://localhost:8000` in
+The `role` union appears in a third place too — the SQL `CHECK` constraint. All
+three must agree.
+
+- **`POST /chat` streams raw `text/plain` token chunks** — no SSE, no JSON, no
+  framing; the client just concatenates. Changing that means rewriting the
+  reader loop in `frontend/app/page.tsx`. Details in `backend/routers/CLAUDE.md`.
+- **The thread UUID is minted client-side** before the first message; the server
+  never allocates one. This is what ties the two persistence systems together.
+- **Titles are first-message-only.** The client sends a title on the first
+  message and `""` afterwards, and the backend never updates an existing title.
+- **The backend URL is hardcoded** to `http://localhost:8000` in
   `frontend/lib/api/threads.ts` and inline in `frontend/app/page.tsx`. Deploying
-  anywhere means introducing an env-based base URL in **both** places.
-- CORS (`backend/app.py`) allows only `localhost`/`127.0.0.1` on any port, via
-  `allow_origin_regex`. `allow_origins` is intentionally empty. A deployed
-  frontend origin must be added here or every request fails preflight.
-- The thread UUID is minted **client-side** before the first message. The server
-  never allocates it. `create_thread_table_entry` is therefore called on every
-  message, not just the first.
-- Title is sent only on the first message of a thread (`""` afterwards), and the
-  backend never updates an existing title — see `backend/CLAUDE.md`.
+  means introducing an env-based base URL in **both** places.
+- **CORS allows only `localhost`/`127.0.0.1`** on any port, via
+  `allow_origin_regex` in `backend/app.py`; `allow_origins` is intentionally
+  empty. A deployed frontend origin must be added there or every request fails
+  preflight.
 
 ---
 
-## Known drift (fix or delete these entries as they are resolved)
+## Known issues
 
-1. **`backend/app.py:13` imports a deleted module.**
-   `from backend.clients.llm.gemini import create_model` — `gemini.py` was
-   removed in commit `44be6f7` when the provider factory was introduced. The
-   surviving module is `backend/clients/llm/factory.py`. The app cannot start
-   until this import is corrected. `backend/agent_graph/langgraph.py` already
-   imports the factory correctly.
-2. **The model picker is inert.** `frontend/app/page.tsx` sends
-   `model: "gemini" | "qwen"` in the `/chat` body, but `ChatRequest` in
-   `backend/schema.py` declares no `model` field, so Pydantic drops it silently.
-   The provider is chosen once at startup from `LLM_PROVIDER`, and the graph is
-   compiled with a single model instance for the whole process lifetime.
-   Honouring per-request model selection means threading it through
-   `build_advising_graph` / `generate_response_stream`, not just adding a field.
-3. **`**/__init__.py` is gitignored.** Packages work as implicit namespace
-   packages, which is fine for imports but means a deliberately added
-   `__init__.py` will never be committed. If you need package-level init code,
-   change `.gitignore` first.
+Each area's issues are listed at the bottom of its own `CLAUDE.md`. Two are
+worth knowing before you touch anything:
+
+1. **The server does not currently start.** `backend/app.py` imports a module
+   that was deleted — see `backend/CLAUDE.md`.
+2. **`**/__init__.py` is gitignored.** Packages work as implicit namespace
+   packages, which is fine for imports, but a deliberately added `__init__.py`
+   will never be committed. Change `.gitignore` first if you need one.
