@@ -33,9 +33,10 @@ file. Backend internals belong in the nested backend files:
 - `backend/clients/CLAUDE.md` — Pinecone adapter
 - `backend/clients/llm/CLAUDE.md` — LLM provider factory
 - `backend/tests/CLAUDE.md` — the integration suite and its safety guards
+- `supabase/CLAUDE.md` — migrations, schema, grants, local stack config
+- `ingestion/CLAUDE.md` — scraper, cleaning rules, Pinecone upsert
 
-`frontend/`, `ingestion/`, and `supabase/` have no `CLAUDE.md` yet; facts about
-them live here until they do.
+`frontend/` has no `CLAUDE.md` yet; facts about it live here until it does.
 
 ---
 
@@ -89,8 +90,8 @@ aligned. Consequences to keep in mind:
 |---|---|
 | `backend/` | FastAPI app, routers, LangGraph agent, db layer, clients. See `backend/CLAUDE.md`. |
 | `frontend/` | Next.js 16 App Router + React 19 + Tailwind. Single-page chat UI. |
-| `ingestion/` | Offline scripts: bulletin scraper → CSV → Pinecone upsert. Not imported by the server at runtime. |
-| `supabase/` | Supabase CLI project: `config.toml` and the SQL migrations that define `threads` / `conversations`. |
+| `ingestion/` | Offline scripts: bulletin scraper → CSV → Pinecone upsert. Not imported by the server at runtime. See `ingestion/CLAUDE.md`. |
+| `supabase/` | Supabase CLI project: `config.toml` and the SQL migrations that define `threads` / `conversations`. See `supabase/CLAUDE.md`. |
 | `data/` | Scraped CSVs. Gitignored. |
 | `pytest.ini` | Sets `pythonpath = .` and `testpaths = backend/tests`. |
 
@@ -134,28 +135,19 @@ importing `backend.db.supabase_operations`.
 ## Database
 
 Schema lives in `supabase/migrations/`, applied with `supabase db reset`.
+`supabase/CLAUDE.md` is authoritative for the DDL, the migration list, the
+local-stack config, and the workflow; `backend/db/CLAUDE.md` covers how the
+application uses the tables.
 
-- `threads` — `id uuid PK`, `title text not null default 'New Conversation'`,
-  `created_at`, `updated_at`. RLS enabled.
-- `conversations` — `id bigint identity PK`, `thread_id uuid → threads(id) ON DELETE CASCADE`,
-  `role text CHECK (role in ('user','advising_bot'))`, `content text`, `created_at`.
-  RLS enabled.
+The two facts that bite hardest, repeated here because they cross layers:
 
-Two migration-level gotchas already paid for once, documented in the SQL:
-
-- **Grants are not automatic.** Tables created by migration have no Data API
-  grants; the `20260825180158_grant_data_api_access.sql` migration grants
-  `service_role`. Without it every backend write fails with
-  `permission denied for table threads (42501)`. The remote project doesn't hit
-  this only because its tables were originally made by hand in the dashboard.
-  **Any new table needs an explicit grant to `service_role` in its migration.**
-- `anon` and `authenticated` are deliberately granted **nothing**. The browser
-  talks to FastAPI, never to PostgREST. Only revisit this alongside real RLS
-  policies.
-- `threads.updated_at` has **no touch trigger**. Nothing in the app writes it,
-  so it always equals `created_at` in practice — see `backend/CLAUDE.md`.
-
----
+- **Grants are not automatic.** A table created by migration has no Supabase
+  Data API grants, and every backend write fails with
+  `permission denied for table threads (42501)`. Any new table needs an explicit
+  `grant … to service_role` in its own migration. The remote project does not
+  hit this only because its tables were made by hand in the dashboard.
+- **`threads.updated_at` has no touch trigger.** Nothing writes it, yet
+  `list_all_threads` orders by it, so the sidebar is ordered by creation time.
 
 ## Frontend ↔ backend contract
 
