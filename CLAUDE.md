@@ -41,10 +41,14 @@ carry specifics.
 | `backend/clients/CLAUDE.md` | Pinecone adapter |
 | `backend/clients/llm/CLAUDE.md` | LLM provider factory |
 | `backend/tests/CLAUDE.md` | the integration suite and its safety guards |
+| `frontend/lib/CLAUDE.md` | the API wrappers, their failure semantics, shared types |
+| `frontend/components/ui/CLAUDE.md` | component props contracts, which state lives where |
 | `supabase/CLAUDE.md` | migrations, DDL, grants, local stack config |
 | `ingestion/CLAUDE.md` | scraper, cleaning rules, Pinecone upsert |
 
-`frontend/` has no `CLAUDE.md` yet; facts about it live here until it does.
+`frontend/app/` has no `CLAUDE.md` yet — `page.tsx` is the whole chat
+orchestrator (thread state, the streaming `POST /chat` call, the message cache),
+so facts about it live here until it gets one.
 
 ---
 
@@ -100,7 +104,7 @@ the browser. Consequences:
 | Path | What lives there |
 |---|---|
 | `backend/` | FastAPI app, routers, LangGraph agent, db layer, clients → `backend/CLAUDE.md` |
-| `frontend/` | Next.js 16 App Router + React 19 + Tailwind. Single-page chat UI. |
+| `frontend/` | Next.js 16 App Router + React 19 + Tailwind. Single-page chat UI → `frontend/lib/CLAUDE.md`, `frontend/components/ui/CLAUDE.md` |
 | `ingestion/` | Offline corpus pipeline: scraper → CSV → Pinecone → `ingestion/CLAUDE.md` |
 | `supabase/` | CLI project: local stack config and the SQL migrations → `supabase/CLAUDE.md` |
 | `data/` | Scraped CSVs. Gitignored. |
