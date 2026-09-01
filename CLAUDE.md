@@ -24,7 +24,18 @@ Update the relevant `CLAUDE.md` when you:
 
 Scope rule: put a fact in the **nearest** `CLAUDE.md` that owns it. Cross-cutting
 architecture and anything spanning frontend↔backend belongs here in the root
-file. Backend internals belong in `backend/CLAUDE.md`.
+file. Backend internals belong in the nested backend files:
+
+- `backend/CLAUDE.md` — hub: layering rules, error-handling layers, cross-cutting invariants
+- `backend/routers/CLAUDE.md` — endpoints, `/chat` lifecycle, streaming contract
+- `backend/agent_graph/CLAUDE.md` — graph state, nodes, summarisation, checkpointing
+- `backend/db/CLAUDE.md` — operations, exception classification, schema and migrations
+- `backend/clients/CLAUDE.md` — Pinecone adapter
+- `backend/clients/llm/CLAUDE.md` — LLM provider factory
+- `backend/tests/CLAUDE.md` — the integration suite and its safety guards
+
+`frontend/`, `ingestion/`, and `supabase/` have no `CLAUDE.md` yet; facts about
+them live here until they do.
 
 ---
 
