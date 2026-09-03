@@ -37,6 +37,7 @@ Windows:
 ```scoop install supabase ```
 
 If want to do deployment with Supabase, download Docker Desktop [here](https://docs.docker.com/desktop/setup/install/mac-install/)
+```pip install langchain-ollama```
 
 ```conda install -c conda-forge ollama```
 

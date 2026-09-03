@@ -51,7 +51,7 @@ def token_generator(graph, query:str,pinecone_results:list, thread_id:str, sink:
     except Exception:
         logger.exception("Response failed to generate entirely")
         # when there is an error, immediately terminate 
-        yield "\n\n[Advising Bot failed to finish generating this response.]"
+        yield "\n\nAdvising Bot failed to finish generating this response."
         # partial responses are still accpeted, if the connection stops midway, so do not clear sink
 
 @router.post("")

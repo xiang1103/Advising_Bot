@@ -109,7 +109,7 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
   framing, no event names, no terminator. `frontend/app/page.tsx` just appends
   every decoded chunk. Adding a JSON envelope means rewriting that reader loop.
 - `token_generator` catches everything, logs it, and yields
-  `"\n\n[Advising Bot failed to finish generating this response.]"`. It
+  `"\n\nAdvising Bot failed to finish generating this response."`. It
   **deliberately does not clear the sink**: a partial answer is still worth
   persisting, and a client that disconnects mid-stream still gets what it saw
   saved.
