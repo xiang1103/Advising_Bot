@@ -16,9 +16,6 @@ def create_model(
     provider: str | None = None,
     model_name: str | None = None,
 ) -> BaseChatModel:
-
-    provider = (provider or os.getenv("LLM_PROVIDER", "gemini")).strip().lower()
-
     if provider == "gemini":
         return ChatGoogleGenerativeAI(
             api_key=gemini_key,
@@ -29,7 +26,7 @@ def create_model(
     if provider == "ollama":
         from langchain_ollama import ChatOllama
         return ChatOllama(
-            model=model_name or OLLAMA_MODEL,
+            model= OLLAMA_MODEL,
             temperature=1.0,
             reasoning=False,
         )

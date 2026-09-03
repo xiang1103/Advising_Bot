@@ -38,6 +38,10 @@ Windows:
 
 If want to do deployment with Supabase, download Docker Desktop [here](https://docs.docker.com/desktop/setup/install/mac-install/)
 
+```conda install -c conda-forge ollama```
+
+
+
 ## How to Get Started
 
 `cd frontend/`

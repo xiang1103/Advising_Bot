@@ -122,11 +122,16 @@ cd frontend && npm install && npm run dev
 python -m uvicorn backend.app:app --reload --port 8000
 
 # optional — local model
-ollama serve            # port 11434, then set LLM_PROVIDER=ollama
+ollama serve            # port 11434, then pick "qwen" in the composer
 
 # tests — needs Docker
 supabase start && supabase db reset && pytest
 ```
+
+`npm run dev` has a `predev` hook (`frontend/scripts/free-port.mjs`) that kills
+whatever is listening on port 3000 before starting Next — so a stale dev server
+never forces a port bump. It never fails the run; if it cannot free the port,
+`next dev` reports the conflict itself.
 
 **Always run the backend from the repo root.** Every backend module imports
 absolutely (`from backend.config import ...`), so the repo root must be the
@@ -138,7 +143,7 @@ import root. `pytest.ini` sets `pythonpath = .` to reproduce this for tests.
 |---|---|---|
 | `PINECONE_KEY` | `backend/clients/pinecone_driver.py` | read at import time |
 | `GEMINI_KEY` | `backend/clients/llm/factory.py` | read at import time |
-| `LLM_PROVIDER` | `backend/clients/llm/factory.py` | `gemini` (default) or `ollama`; read per call |
+| `LLM_PROVIDER` | `backend/clients/llm/factory.py` | fallback only — `/chat` passes the provider explicitly from the request. Applies to scripts/tests that call `create_model()` bare |
 | `SUPABASE_URL` | `backend/db/supabase_operations.py` | read at import time |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/db/supabase_operations.py` | backend is the only writer; bypasses RLS |
 | `LANGGRAPH_CHECKPOINT_URL` | `backend/app.py` lifespan | **hard requirement** — startup raises `RuntimeError` without it |
@@ -169,6 +174,7 @@ key and bypasses RLS; the browser never talks to PostgREST.
 |---|---|
 | `Thread { id, title }` | `ThreadSummary` |
 | `Message { role, content, pending? }` | — (`pending` is client-only) |
+| composer's `Model = "gemini" \| "qwen"` | `ChatRequest.model` (validated against `config.SELECTABLE_MODELS`) |
 | `ConversationBlock = Message & { id: number }` | `ConversationBlock` |
 
 The `role` union appears in a third place too — the SQL `CHECK` constraint. All
@@ -179,6 +185,11 @@ three must agree.
   reader loop in `frontend/app/page.tsx`. Details in `backend/routers/CLAUDE.md`.
 - **The thread UUID is minted client-side** before the first message; the server
   never allocates one. This is what ties the two persistence systems together.
+- **The model is picked per message.** The composer sends `model` in the
+  `/chat` body; the backend maps it through `config.SELECTABLE_MODELS` and
+  compiles that model's graph on first use, against the shared checkpointer — so
+  a thread can switch models and keep its memory. An id the backend does not
+  know is a 400. The frontend's `MODELS` list and `SELECTABLE_MODELS` must agree.
 - **Titles are first-message-only.** The client sends a title on the first
   message and `""` afterwards, and the backend never updates an existing title.
 - **The backend URL is hardcoded** to `http://localhost:8000` in
@@ -193,11 +204,9 @@ three must agree.
 
 ## Known issues
 
-Each area's issues are listed at the bottom of its own `CLAUDE.md`. Two are
+Each area's issues are listed at the bottom of its own `CLAUDE.md`. This one is
 worth knowing before you touch anything:
 
-1. **The server does not currently start.** `backend/app.py` imports a module
-   that was deleted — see `backend/CLAUDE.md`.
-2. **`**/__init__.py` is gitignored.** Packages work as implicit namespace
+1. **`**/__init__.py` is gitignored.** Packages work as implicit namespace
    packages, which is fine for imports, but a deliberately added `__init__.py`
    will never be committed. Change `.gitignore` first if you need one.

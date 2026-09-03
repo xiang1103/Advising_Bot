@@ -41,9 +41,13 @@ Request bodies are Pydantic models from `backend/schema.py`. Consequences:
   FastAPI**, not something the handler ever sees. Handlers convert back with
   `str(payload.thread_id)` before touching the db layer, because the Supabase
   client serialises to JSON and a `UUID` object is not JSON-serialisable.
-- **Undeclared fields are silently dropped.** This is how the frontend's `model`
-  field currently vanishes (see "Known issues"). If a client sends a field and
-  it seems to have no effect, check `schema.py` first.
+- **Undeclared fields are silently dropped.** If a client sends a field and it
+  seems to have no effect, check `schema.py` first.
+- **`ChatRequest.model` is a plain `str | None`, not a `Literal`**, so an
+  unrecognised model is **not** a 422 from Pydantic. The valid set lives in
+  `config.SELECTABLE_MODELS`, and the registry rejects a bad one with a 400.
+  `None` means "the client did not choose", and the router falls back to
+  `DEFAULT_MODEL` — that is what keeps a client that omits the field working.
 - Return annotations (`-> list[ThreadSummary]`) are enforced as **response**
   models. `retrieve_thread_conversation` hands back raw dicts from PostgREST; if
   a row's `role` is not `"user"` or `"advising_bot"`, response validation fails
@@ -62,7 +66,13 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
    completion. `TIMEZONE` is UTC from `config.py`; never use a naive
    `datetime.now()` here.
 
-2. **All fallible work happens before the `StreamingResponse` is returned.**
+2. **`graph_registry.get(payload.model)` resolves the model before anything
+   else is spent.** An unknown id raises `UnknownModelError` → 400 here, so a
+   bad selection costs no Pinecone query and writes no `threads` row. This is
+   also where a model is **built**, on the first request that selects it, so the
+   call is fallible and must stay above the `return` with everything else.
+
+3. **All fallible work happens before the `StreamingResponse` is returned.**
    Retrieval (`get_pc_index` → `pc_search` → `retrieve_topk_text`) runs up front
    and raises `HTTPException(500)` on failure.
    **This is not stylistic.** Once a streaming response has begun, the status
@@ -70,7 +80,7 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
    after that point can only be reported as text inside a `200 OK`. Any new
    fallible step you add must go **above** the `return`.
 
-3. **`create_thread_table_entry(thread_id, thread_title)` runs before anything
+4. **`create_thread_table_entry(thread_id, thread_title)` runs before anything
    can write to `conversations`,** because `conversations.thread_id` is a
    foreign key. Reversing these two calls silently loses every message.
    `tests/test_conversation_persistence.py::test_save_conversation_rejects_unknown_thread`
@@ -78,7 +88,7 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
    `try` — its `DatabaseError` propagates to `app.py`'s handlers and becomes a
    real 503/400/500, which is still possible because streaming has not started.
 
-4. **A `collected_convo: list[str]` sink is shared by reference** between the
+5. **A `collected_convo: list[str]` sink is shared by reference** between the
    generator and the background task. `token_generator` appends each chunk as it
    yields; `persist_conversation` reads the same list object after the stream
    ends.
@@ -86,7 +96,7 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
    reassigning inside the generator leaves the background task holding the
    original, empty list. Only `.append()`.
 
-5. **`BackgroundTasks` is attached to the response**, so persistence runs after
+6. **`BackgroundTasks` is attached to the response**, so persistence runs after
    the last byte is sent. This is why the reply feels instant and the DB write
    never blocks the stream.
 
@@ -113,6 +123,7 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
 | Failure | What the client sees |
 |---|---|
 | Bad UUID / missing field | 422 (FastAPI validation) |
+| Unknown `model` value | 400 `"Unsupported model selection."` |
 | Pinecone retrieval fails | 500 `"Failed to extract factual information for model"` |
 | `create_thread_table_entry` fails | 503 / 400 / 500 from `app.py`'s DB handlers |
 | LLM fails mid-stream | 200, with the failure marker appended to the body |
@@ -155,14 +166,8 @@ That is older code and contradicts the rule above; prefer the
 
 ## Known issues (delete when fixed)
 
-1. **`chat.py:73` discards the exception.** `except Exception as exc:` binds
+1. **The Pinecone `except` in `chat()` discards the exception.** `except Exception as exc:` binds
    `exc` and never uses it — no `logger.exception`, so the original Pinecone
    error is lost and only the generic detail string survives. Log it before
    raising.
-2. **`ChatRequest` has no `model` field** while `frontend/app/page.tsx` sends
-   `model: "gemini" | "qwen"`. Pydantic drops it, so the UI's provider dropdown
-   does nothing. The provider is fixed at startup from `LLM_PROVIDER` and the
-   graph is compiled once with a single model instance — honouring per-request
-   selection requires threading it through `build_advising_graph` /
-   `generate_response_stream`, not just adding a field.
-3. **`get_all_threads` flattens the semantic error layer** (see above).
+2. **`get_all_threads` flattens the semantic error layer** (see above).

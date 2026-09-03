@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     thread_id: UUID     # convert str into valid UUID 
     thread_title: str
     message: str
+    model: str | None = None    # which model is selected 
 
 class ThreadSummary(BaseModel): 
     id: UUID
