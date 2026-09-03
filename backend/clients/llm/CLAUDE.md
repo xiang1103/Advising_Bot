@@ -29,6 +29,9 @@ Provider resolution, in order:
 The value is `.strip().lower()`-ed, so `" Gemini "` works. An unrecognised
 provider raises `ValueError("Unknown LLM provider")`.
 
+`provider` is passed explicitly by the graph registry on the request path, so
+`LLM_PROVIDER` only applies to callers that pass nothing.
+
 | Provider | Class | Default model | Settings |
 |---|---|---|---|
 | `gemini` | `ChatGoogleGenerativeAI` | `config.GEMINI_MODEL` (`gemini-3-flash-preview`) | `temperature=1.0`, `max_retries=2` |
@@ -44,22 +47,32 @@ provider raises `ValueError("Unknown LLM provider")`.
   a module-level constant, so changing the environment after import has no
   effect on the key (unlike `LLM_PROVIDER`, which is read per call).
 - The local model runs on Ollama's default port 11434; start it with
-  `ollama serve` before setting `LLM_PROVIDER=ollama`.
+  `ollama serve` before selecting `qwen` in the composer. Nothing checks that it
+  is up: `ChatOllama` constructs fine without a server, so the failure appears
+  as a dead stream at generation time, not at model-build time.
 
 ---
 
 ## When the model is chosen
 
-**Once, at application startup.** `app.py`'s lifespan calls `create_model()`
-with no arguments and binds the result into the compiled graph with
-`functools.partial`. That single instance serves every request for the life of
-the process.
+**Per request, by the client — but each model is built only once.**
+`agent_graph/registry.py` calls `create_model(provider=...)` the first time a
+request selects a given model, then caches the compiled graph for the life of
+the process. `app.py` builds nothing at startup.
 
-This is why the frontend's model dropdown does nothing today: even if
-`ChatRequest` declared a `model` field, there is no per-request seam to use it.
-Supporting it means either compiling a graph per provider at startup and
-selecting between them, or passing the model through `generate_response_stream`
-into the node — a real change, not a field addition.
+Two consequences for this file:
+
+- **`LLM_PROVIDER` no longer decides what the app serves.** The registry always
+  passes an explicit `provider`, so the env var is now only a default for
+  callers that pass none — scripts, tests, and a bare `create_model()`. The
+  browser's choice wins on the request path.
+- **A provider that cannot be constructed fails on first selection, not at
+  startup.** Missing `langchain_ollama`, a bad key: the server still boots and
+  every other model keeps working. The failed build is not cached, so it is
+  retried on the next request that asks for it.
+
+The user-visible model ids and the providers they map to live in
+`config.SELECTABLE_MODELS`; see `agent_graph/CLAUDE.md` for the registry itself.
 
 ---
 
@@ -84,21 +97,17 @@ into the node — a real change, not a field addition.
 
 This directory used to hold `gemini.py` with its own `create_model`. It was
 deleted in commit `44be6f7` ("feat: integrate local model capability") and
-replaced by `factory.py`. **`backend/app.py:13` still imports the deleted
-module** (`from backend.clients.llm.gemini import create_model`), so the server
-cannot start until that import is pointed at `factory`. A stale
-`__pycache__/gemini.cpython-312.pyc` is still on disk, but Python will not
-import from it without the source file.
+replaced by `factory.py`. A stale `__pycache__/gemini.cpython-312.pyc` is still
+on disk, but Python will not import from it without the source file.
 
 ---
 
 ## Known issues (delete when fixed)
 
-1. **`app.py` imports the deleted `gemini` module** — see above. Blocking.
-2. **`temperature=1.0` for a factual advising bot** is high; retrieval-grounded
+1. **`temperature=1.0` for a factual advising bot** is high; retrieval-grounded
    answers usually want something much lower. Untuned, not deliberate as far as
    the history shows.
-3. **`load_dotenv()` at module import** — side effect on the process
+2. **`load_dotenv()` at module import** — side effect on the process
    environment; belongs at the entry point.
-4. **No timeout on the Gemini client.** `max_retries=2` bounds retries but not
+3. **No timeout on the Gemini client.** `max_retries=2` bounds retries but not
    total wall time, and this call sits on the request path.

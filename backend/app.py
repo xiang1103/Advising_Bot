@@ -9,15 +9,19 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from langgraph.checkpoint.postgres import PostgresSaver
-from backend.agent_graph.langgraph import build_advising_graph
-from backend.clients.llm.gemini import create_model
-from backend.config import GEMINI_MODEL 
+from backend.agent_graph.registry import GraphRegistry, UnknownModelError
 from backend.db.error_handler import (
     DatabaseError,
     DatabaseRequestError,
     DatabaseUnavailable,
 )
 from backend.routers import chat, threads
+from backend.utils import setup_logging
+
+# nothing configures the root logger otherwise, and its default level hides
+# INFO - including the per-reply model line in agent_graph. verbose=False here
+# means ERROR only, which switches those off again
+setup_logging(verbose=True)
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +35,16 @@ async def lifespan(app: FastAPI):
             "LANGGRAPH_CHECKPOINT_URL environment variable is required to enable LangGraph's Postgres checkpointing."
         )
 
-    # create the model
-    model = create_model()
-    logger.info(f"Model created: {type(model).__name__}")
     # Adapter that opens the Postgres connection and keeps it alive for the app lifespan.
+    # keep the memory up 
     with PostgresSaver.from_conn_string(db_url) as checkpointer:
         checkpointer.setup()
-        app.state.advising_app = build_advising_graph(model=model, max_messages=8).compile(
-            checkpointer=checkpointer
-        )
+        # no model is built here: the registry compiles each graph on the first
+        # request that selects it, so an unused provider is never instantiated
+        # and a broken one only fails the requests that ask for it. Every graph
+        # shares this checkpointer, which is what lets a thread change model
+        # without losing its memory
+        app.state.graph_registry = GraphRegistry(checkpointer=checkpointer, max_messages=8)
         yield
 
 app = FastAPI(lifespan=lifespan)
@@ -98,6 +103,14 @@ async def handle_db_request_error(request: Request, exc: DatabaseRequestError):
 async def handle_db_error(request: Request, exc: DatabaseError):
     # our bug or misconfiguration: never leak the driver message to the client
     return _db_failure(500, "Internal error.", exc)
+
+
+@app.exception_handler(UnknownModelError)
+async def handle_unknown_model(request: Request, exc: UnknownModelError):
+    # the client picked a model the server does not serve: retrying it unchanged
+    # will not help, so this is a 400 rather than a 500
+    logger.warning("Rejected unknown model %r", exc.model_id)
+    return JSONResponse(status_code=400, content={"detail": "Unsupported model selection."})
 
 
 

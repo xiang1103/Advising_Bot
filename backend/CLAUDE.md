@@ -35,17 +35,21 @@ backend/
 
 - **`app.py` is the only place that wires things together**, and the only place
   that knows about every other layer. It resolves `LANGGRAPH_CHECKPOINT_URL`
-  (raising `RuntimeError` if unset), builds the model, opens the
-  `PostgresSaver`, compiles the graph onto `app.state.advising_app`, registers
-  middleware and exception handlers, includes the routers, and exposes
-  `GET /health`. Nothing else should reach across layers like this.
+  (raising `RuntimeError` if unset), opens the `PostgresSaver`, puts a
+  `GraphRegistry` on `app.state.graph_registry`, registers middleware and
+  exception handlers, includes the routers, and exposes `GET /health`. Nothing
+  else should reach across layers like this. It builds **no** model itself —
+  graphs are compiled lazily by the registry, on the first request that selects
+  each model.
 - **`config.py` holds constants only.** No I/O, no clients, no env reads.
 - **`schema.py` is a shared contract**, not just backend types — see the root
   `CLAUDE.md` for the frontend and SQL counterparts it must agree with.
-- **`utils.setup_logging(verbose=False)`** configures the root logger and
-  silences `httpx`/`httpcore`. **Nothing calls it**, so the service currently
-  runs on Python's default logging config; its docstring also disagrees with its
-  code (DEBUG/WARNING vs. INFO/ERROR).
+- **`utils.setup_logging(verbose=True)` is called at `app.py` import time**, and
+  it configures the root logger and silences `httpx`/`httpcore`/`google_genai`.
+  **`verbose` is the difference between INFO and ERROR — not DEBUG and WARNING
+  as its docstring claims.** It has to be `True` for the per-reply model line in
+  `agent_graph/langgraph.py` to appear at all; flipping it to `False` silently
+  switches off every INFO log in the service.
 
 ---
 
@@ -77,7 +81,8 @@ routers  ──►  db/supabase_operations  ──►  db/error_handler
 
 ### The error boundary
 
-Failures are classified once, in `db/`, and translated once, in `app.py`:
+Failures are classified once — in `db/`, or in `agent_graph/registry.py` for a
+bad model selection — and translated once, in `app.py`:
 
 | Layer | Catches | Result |
 |---|---|---|
@@ -85,10 +90,11 @@ Failures are classified once, in `db/`, and translated once, in `app.py`:
 | `@app.exception_handler(DatabaseUnavailable)` | transient DB failure | 503 |
 | `@app.exception_handler(DatabaseRequestError)` | rejected request | 400 |
 | `@app.exception_handler(DatabaseError)` | our bug / misconfiguration | 500 |
+| `@app.exception_handler(UnknownModelError)` | client picked a model we do not serve | 400 |
 
-Two things about this that are easy to get wrong: handlers must be registered
-for **all three classes explicitly**, because FastAPI dispatches on the exact
-class rather than walking the MRO; and driver messages are logged, never
+Two things about this that are easy to get wrong: every exception class needs
+its **own** handler — all three `DatabaseError` classes, not just the base —
+because FastAPI dispatches on the exact class rather than walking the MRO; and driver messages are logged, never
 returned to the client. The signal-to-exception mapping is in
 `db/CLAUDE.md`.
 
@@ -102,9 +108,14 @@ CORS is a separate middleware, so errors it raises never reach the
 Each is enforced or explained in the file that owns it; they are listed here
 because breaking one from a different layer is the realistic failure mode.
 
-- **Startup happens once and is expensive.** The model is created and the graph
-  compiled during the lifespan, inside a `PostgresSaver` context that must stay
-  open for the process lifetime. There is no per-request model-selection seam.
+- **Startup is cheap; the first request for a model is not.** The lifespan only
+  opens the `PostgresSaver` and creates the registry. Each model is instantiated
+  and its graph compiled on the first request that selects it, inside that same
+  `PostgresSaver` context — which must therefore stay open for the process
+  lifetime, since compiling now happens on the request path.
+- **The model is chosen per request, the memory is not.** Every graph shares one
+  checkpointer, so switching model keeps the thread's history. Details in
+  `agent_graph/CLAUDE.md`.
 - **Once a streaming response starts, the status code is fixed.** Every fallible
   step on `/chat` must run before the response is returned.
 - **The thread UUID is minted in the browser** and is the same value in
@@ -123,12 +134,7 @@ because breaking one from a different layer is the realistic failure mode.
 Area-specific issues are listed at the bottom of each nested file. These belong
 to the modules this file owns:
 
-1. **`app.py:13` imports a module that does not exist.**
-   `from backend.clients.llm.gemini import create_model` — that module was
-   deleted when the provider factory was introduced. **The server cannot start
-   until this is fixed.** Background in `clients/llm/CLAUDE.md`.
-2. **`utils.setup_logging()` is never called**, so none of the logging
-   configuration is in effect. `app.py` should call it during startup.
-3. **`app.py` imports `GEMINI_MODEL` but never uses it.** Harmless, but remove
-   it when fixing (1) — it reinforces the wrong idea that `app.py` picks the
-   model.
+1. **`setup_logging`'s docstring disagrees with its code** — it promises
+   DEBUG/WARNING and delivers INFO/ERROR.
+2. **Logging verbosity is hardcoded** to `verbose=True` in `app.py`. Fine for
+   local development, wrong for anything deployed; it wants an env var.

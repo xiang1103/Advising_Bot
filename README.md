@@ -37,6 +37,11 @@ Windows:
 ```scoop install supabase ```
 
 If want to do deployment with Supabase, download Docker Desktop [here](https://docs.docker.com/desktop/setup/install/mac-install/)
+```pip install langchain-ollama```
+
+```conda install -c conda-forge ollama```
+
+
 
 ## How to Get Started
 
@@ -50,6 +55,14 @@ Start another terminal, stay in project root directory,
 Run: ```python -m uvicorn backend.app:app --reload --port 8000```
 
 If using Local Model, run `ollama serve` to launch ollama on port 11434.
+
+Ollama Models for selection: qwen:4b, qwen:8b   
+To run Ollama model on your local machine: run   
+```ollama serve```  
+```ollama pull qwen:4b``` or other models  
+
+To delete Ollama models from your memory:  
+```ollama rm qwen3:4b```
 
 
 ---

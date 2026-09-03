@@ -34,13 +34,14 @@ def persist_conversation(thread_id:str, user_message:str, bot_response:list[str]
     except Exception:
         logger.exception(f"Conversation failed to save for thread {thread_id}")
         
-def token_generator(request:Request, query:str,pinecone_results:list, thread_id:str, sink:list):
+def token_generator(graph, query:str,pinecone_results:list, thread_id:str, sink:list):
     '''
     helper function to generate tokens and keep track of full response 
+    graph: the compiled advising graph for the model this turn selected 
     '''
     try:
         for chunk in generate_response_stream(
-            app=request.app.state.advising_app,
+            app=graph,
             query=query,
             context_results=pinecone_results,
             thread_id=thread_id,
@@ -50,7 +51,7 @@ def token_generator(request:Request, query:str,pinecone_results:list, thread_id:
     except Exception:
         logger.exception("Response failed to generate entirely")
         # when there is an error, immediately terminate 
-        yield "\n\n[Advising Bot failed to finish generating this response.]"
+        yield "\n\nAdvising Bot failed to finish generating this response."
         # partial responses are still accpeted, if the connection stops midway, so do not clear sink
 
 @router.post("")
@@ -62,6 +63,13 @@ def chat(payload: ChatRequest, request:Request):
 
     # store the asked time for the question 
     asked_at = datetime.now(TIMEZONE) 
+
+    # resolve the selected model first: an unknown id raises UnknownModelError,
+    # which app.py turns into a 400, and this way a bad selection costs nothing.
+    # The graph is compiled here on the first request that picks each model, so
+    # this must stay above the return like every other fallible step
+    graph = request.app.state.graph_registry.get(payload.model)
+    logger.info("Thread %s selected model %r", payload.thread_id, payload.model)
 
     # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
     # (the status can no longer be changed once the streaming response has started)
@@ -93,7 +101,7 @@ def chat(payload: ChatRequest, request:Request):
 
     # stream the response and save the conversation at the end 
     return StreamingResponse(
-        token_generator(request, query=user_message,pinecone_results= pinecone_results, thread_id=thread_id, sink=collected_convo),
+        token_generator(graph, query=user_message,pinecone_results= pinecone_results, thread_id=thread_id, sink=collected_convo),
         media_type="text/plain; charset=utf-8",
         background=task_save_convo
     )

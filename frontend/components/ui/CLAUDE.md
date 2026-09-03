@@ -84,18 +84,17 @@ disabled is what prevents that race — do not narrow this prop to just streamin
 ### The model dropdown
 
 Model selection is local state, surfaced only as the second `onSend` argument.
-`page.tsx` forwards it in the `/chat` body as `model`.
+`page.tsx` forwards it in the `/chat` body as `model`, and **the backend honours
+it per message** — it builds that model's graph on first use and answers with it.
 
-**The backend currently ignores it.** `ChatRequest` in `backend/schema.py`
-declares no `model` field, so Pydantic drops it silently, and the provider is
-fixed at process startup from `LLM_PROVIDER`. The dropdown changes nothing
-today. See `backend/clients/llm/CLAUDE.md` for what honouring it would require —
-it is not just adding a field. Until then, treat this control as aspirational
-UI.
+`MODELS` here (`gemini`, `qwen`) is the *user-facing* list; the backend maps
+those ids to provider names (`gemini`, `ollama`) in `config.SELECTABLE_MODELS` —
+`qwen` names the model, `ollama` names the runtime. **These two lists are a
+contract**: a value here that is not a key there gets a 400 from `/chat`. Adding
+a model means editing both.
 
-`MODELS` here (`gemini`, `qwen`) is a separate list from the backend's provider
-names (`gemini`, `ollama`) — note `qwen` names the *model*, `ollama` names the
-*runtime*. Any real wiring has to reconcile those.
+Switching mid-thread is supported and keeps the conversation's memory — every
+model shares one checkpointer. See `backend/agent_graph/CLAUDE.md`.
 
 ---
 
@@ -163,16 +162,14 @@ Generated, not authored. Treat it as a dependency:
 
 ## Known issues (delete when fixed)
 
-1. **The model dropdown does nothing** — see above. This is the most likely
-   thing to confuse someone new: the UI is complete, the backend seam is not.
-2. **`demo.tsx` is dead code.** It renders `AIChatInput` with a no-op `onSend`
+1. **`demo.tsx` is dead code.** It renders `AIChatInput` with a no-op `onSend`
    and is imported by nothing.
-3. **`onSubmit={handleSend}` on the `motion.div`** in `ai-chat-input.tsx` is
+2. **`onSubmit={handleSend}` on the `motion.div`** in `ai-chat-input.tsx` is
    inert — a `div` never fires submit, and there is no `<form>`. Sending works
    only via the button's `onClick` and the input's Enter handler.
-4. **`containerVariants` declares only a `collapsed` state**, while the
+3. **`containerVariants` declares only a `collapsed` state**, while the
    component sets both `initial` and `animate` to it, so the "expand on focus"
    animation the `isActive` state implies never happens. `isActive` now only
    gates the placeholder rotation.
-5. **No Shift+Enter for newlines** — the composer is a single-line `<input>`, so
+4. **No Shift+Enter for newlines** — the composer is a single-line `<input>`, so
    multi-line questions cannot be typed.

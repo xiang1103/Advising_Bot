@@ -1,9 +1,10 @@
 # `backend/agent_graph/` — LangGraph conversation engine
 
-`langgraph.py` owns everything about how a reply is produced: the conversation
+Two modules. `langgraph.py` owns everything about how a reply is produced: the conversation
 state, the prompt, the summarisation policy that keeps context bounded, and the
 token stream handed to `routers/chat.py`. It is the only place that talks to the
-LLM at request time.
+LLM at request time. `registry.py` owns **which model** produces it — see
+"The graph registry" below.
 
 This module knows nothing about HTTP, and nothing about the `threads` /
 `conversations` tables. Its memory is the **LangGraph checkpoint**, which is a
@@ -15,8 +16,9 @@ separate store — see the root `CLAUDE.md`.
 
 **Update this file in the same commit as any change here.** Especially: adding
 or renaming a node or edge, changing `AdvisingState`, changing `SYSTEM_ROLE`,
-changing the summarisation policy or `max_messages`, or adding a provider whose
-streamed content has a different shape. If you fix an item under "Known issues",
+changing the summarisation policy or `max_messages`, changing how graphs are
+built or cached, or adding a provider whose streamed content has a different
+shape. If you fix an item under "Known issues",
 delete the entry.
 
 ---
@@ -29,10 +31,11 @@ START ──► chatbot ──┬──► summarize_node ──► END      whe
 ```
 
 Built by `build_advising_graph(model=None, max_messages=8)`, which returns an
-**uncompiled** `StateGraph`. `app.py` compiles it once at startup with the
-Postgres checkpointer and stores the result on `app.state.advising_app`. Nodes
-are bound to the model with `functools.partial`, so the model instance is fixed
-for the process lifetime.
+**uncompiled** `StateGraph`. `registry.py` compiles it against the Postgres
+checkpointer. Nodes are bound to the model with `functools.partial`, so **one
+compiled graph serves exactly one model** for the life of the process — which is
+why per-request selection is a matter of holding several compiled graphs, not of
+swapping a model inside one.
 
 ### `AdvisingState(MessagesState)`
 
@@ -128,6 +131,15 @@ The single entry point used by `routers/chat.py`. A generator of `str` chunks.
   `metadata["langgraph_node"] == "chatbot"`, so summarisation tokens never leak
   into the user's reply. Any new node that calls the model needs to stay out of
   that filter, or be added to it deliberately.
+- **Logs the model once per reply**, at INFO, on the first `chatbot` chunk:
+  `thread <id>: answering with <ls_model_name> (provider <ls_provider>, ...)`.
+  The values come from the stream's own `metadata`, which LangChain populates
+  from the model that actually produced the token — so this is ground truth, not
+  a restatement of what the router selected. Comparing it against the router's
+  `"Thread ... selected model ..."` line is what tells you whether a wrong reply
+  came from the browser sending the wrong id or the registry handing back the
+  wrong graph. **Nothing is logged if the stream yields no chatbot chunks**,
+  which is itself the signal for the silent-empty-stream case below.
 - Handles **two content shapes**: a plain `str`, and a list of content blocks
   where the text is at `content[0].get("text")` (what Gemini emits). A provider
   that emits a third shape will silently stream **nothing** — no error, just an
@@ -139,22 +151,68 @@ The single entry point used by `routers/chat.py`. A generator of `str` chunks.
 
 ---
 
+## The graph registry
+
+`registry.py` is how one deployment serves several models. `app.py` creates a
+single `GraphRegistry(checkpointer, max_messages)` in its lifespan and puts it on
+`app.state.graph_registry`; `routers/chat.py` calls `registry.get(payload.model)`
+to pick the graph for each turn.
+
+```
+GraphRegistry.get(model_id)
+  model_id or DEFAULT_MODEL
+    → SELECTABLE_MODELS[model_id]        unknown  → UnknownModelError
+    → cached graph?                      hit      → return it
+    → create_model(provider=...) + build_advising_graph(...).compile(checkpointer)
+```
+
+- **Memory is shared, because every graph is compiled against the *same*
+  checkpointer.** The graph is a stateless executor; the conversation lives in
+  Postgres under `thread_id`. So a thread can change model mid-conversation and
+  keep its history and summary. That is the whole point of the design — do not
+  give a model its own checkpointer.
+- **Building is lazy and cached.** A model is instantiated on the first request
+  that selects it, never at startup, so an unused provider is never constructed
+  and a broken one only fails the requests that ask for it. A failed build is
+  **not** cached, so the next request retries it.
+- **The cache is populated under a `threading.Lock`.** `/chat` is a sync route,
+  so FastAPI runs it in a threadpool and two first requests for the same model
+  can arrive together. The lock is held only for the build; hits take the
+  lock-free fast path.
+- **`UnknownModelError` carries no HTTP status**, per the layering rule — it is a
+  `ValueError` subclass that `app.py` maps to a 400.
+- **Switching model mid-thread is the case to test after touching this.** The
+  checkpoint stores whatever `AIMessage` shape the *writing* model produced, and
+  the two providers do not agree: Gemini emits list-of-blocks content where
+  Ollama emits plain `str`. Replaying one model's history into the other is the
+  most likely place for this to break, and per `generate_response_stream` below,
+  a shape mismatch streams **nothing** rather than raising.
+- **The summary can be written by one model and consumed by another** — it is
+  just text, so this is fine, but it is another reason to exercise a switch
+  mid-thread rather than only on a fresh one.
+
+Selectable ids live in `config.SELECTABLE_MODELS`, which maps the string the
+browser sends to a provider name for `create_model`. Adding a model is a one-line
+change there — plus the matching entry in the frontend's `MODELS` list.
+
+---
+
 ## Checkpointing
 
-The `PostgresSaver` is created in `app.py`'s lifespan:
+The `PostgresSaver` is created in `app.py`'s lifespan and handed to the registry:
 
 ```python
 with PostgresSaver.from_conn_string(db_url) as checkpointer:
     checkpointer.setup()
-    app.state.advising_app = build_advising_graph(...).compile(checkpointer=checkpointer)
+    app.state.graph_registry = GraphRegistry(checkpointer=checkpointer, max_messages=8)
     yield
 ```
 
 - `checkpointer.setup()` creates the LangGraph tables on first run. It is
   idempotent.
 - The connection is held open for the whole application lifespan by the `with`
-  block. **Do not move the compile out of the `with`** — the connection closes
-  on exit and every request then fails.
+  block. **Do not move the registry out of the `with`** — graphs are compiled
+  lazily, on the request path, so the connection has to still be open then.
 - `LANGGRAPH_CHECKPOINT_URL` is a hard requirement; startup raises `RuntimeError`
   without it.
 - Checkpoint rows are **not** cascaded when a `threads` row is deleted. A future
@@ -185,8 +243,6 @@ with PostgresSaver.from_conn_string(db_url) as checkpointer:
    this module has a side effect on the process environment. Environment loading
    belongs at the entry point.
 3. **Commented-out `logging.basicConfig` and logger-silencing block** at the top
-   of the file, superseded by `utils.setup_logging()`. `logging` is imported
-   solely for those dead lines and is otherwise unused — this module logs
-   nothing at all, which makes a silent empty stream (see above) harder to
-   diagnose than it needs to be.
+   of the file, superseded by `utils.setup_logging()`. Dead lines; the module
+   has a real logger now.
 4. **No cheap-model split for summarisation** — see `summarize_node` above.
