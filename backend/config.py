@@ -17,6 +17,8 @@ SELECTABLE_MODELS = {
 
 # LLM model settings
 GEMINI_MODEL= "gemini-3-flash-preview"
-OLLAMA_MODEL="qwen3:8b"
+OLLAMA_DEFAULT_MODEL="qwen3:4b"
+OLLAMA_SMALL_MODEL= "qwen3:1.7b"
+OLLAMA_LARGE_MODEL= "qwen3:8b"
 
 TIMEZONE = datetime.timezone.utc

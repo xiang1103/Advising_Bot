@@ -56,6 +56,14 @@ Run: ```python -m uvicorn backend.app:app --reload --port 8000```
 
 If using Local Model, run `ollama serve` to launch ollama on port 11434.
 
+Ollama Models for selection: qwen:4b, qwen:8b   
+To run Ollama model on your local machine: run   
+```ollama serve```  
+```ollama pull qwen:4b``` or other models  
+
+To delete Ollama models from your memory:  
+```ollama rm qwen3:4b```
+
 
 ---
 *Built by SBU Undergrads, for SBU Undergrads.*

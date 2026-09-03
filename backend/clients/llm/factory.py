@@ -5,7 +5,7 @@ LLM provider factory. Currently either gemini or qwen
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models import BaseChatModel
 from dotenv import load_dotenv
-from backend.config import GEMINI_MODEL, OLLAMA_MODEL
+from backend.config import GEMINI_MODEL, OLLAMA_SMALL_MODEL
 
 import os
 
@@ -26,9 +26,10 @@ def create_model(
     if provider == "ollama":
         from langchain_ollama import ChatOllama
         return ChatOllama(
-            model= OLLAMA_MODEL,
+            model= OLLAMA_SMALL_MODEL,
             temperature=1.0,
             reasoning=False,
+            num_ctx=8192, 
         )
 
     raise ValueError("Unknown LLM provider")
