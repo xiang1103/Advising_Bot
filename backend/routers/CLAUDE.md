@@ -70,7 +70,10 @@ The ordering in `chat.py::chat` is load-bearing. Read this before editing it.
    else is spent.** An unknown id raises `UnknownModelError` → 400 here, so a
    bad selection costs no Pinecone query and writes no `threads` row. This is
    also where a model is **built**, on the first request that selects it, so the
-   call is fallible and must stay above the `return` with everything else.
+   call is fallible and must stay above the `return` with everything else. The
+   selection is logged here; the model that *actually* answers is logged by
+   `generate_response_stream`. Two lines, on purpose — see
+   `agent_graph/CLAUDE.md`.
 
 3. **All fallible work happens before the `StreamingResponse` is returned.**
    Retrieval (`get_pc_index` → `pc_search` → `retrieve_topk_text`) runs up front

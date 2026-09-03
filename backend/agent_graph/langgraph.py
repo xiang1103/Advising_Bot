@@ -9,6 +9,8 @@ import logging
 
 from backend.clients.llm.factory import create_model
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 # logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 # silence logger warnnings from Langgraph
@@ -131,9 +133,18 @@ def generate_response_stream(
     }
     config = {"configurable": {"thread_id": thread_id}}
 
+    logged_model= False 
     # chunk: actual data from chatbot. Metadata: which node of the workflow is on
+    logged_model = False
     for chunk, metadata in app.stream(input_state, config=config, stream_mode="messages"):
         if metadata.get("langgraph_node") == "chatbot":
+
+            # log model information for the first time 
+            if not logged_model:
+                logged_model = True
+                logger.info(
+                    f"answering with {metadata.get("ls_model_name"),}"
+                )
             content = chunk.content
             if isinstance(content, list) and len(content) > 0:
                 text = content[0].get("text", "")

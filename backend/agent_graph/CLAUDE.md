@@ -131,6 +131,15 @@ The single entry point used by `routers/chat.py`. A generator of `str` chunks.
   `metadata["langgraph_node"] == "chatbot"`, so summarisation tokens never leak
   into the user's reply. Any new node that calls the model needs to stay out of
   that filter, or be added to it deliberately.
+- **Logs the model once per reply**, at INFO, on the first `chatbot` chunk:
+  `thread <id>: answering with <ls_model_name> (provider <ls_provider>, ...)`.
+  The values come from the stream's own `metadata`, which LangChain populates
+  from the model that actually produced the token — so this is ground truth, not
+  a restatement of what the router selected. Comparing it against the router's
+  `"Thread ... selected model ..."` line is what tells you whether a wrong reply
+  came from the browser sending the wrong id or the registry handing back the
+  wrong graph. **Nothing is logged if the stream yields no chatbot chunks**,
+  which is itself the signal for the silent-empty-stream case below.
 - Handles **two content shapes**: a plain `str`, and a list of content blocks
   where the text is at `content[0].get("text")` (what Gemini emits). A provider
   that emits a third shape will silently stream **nothing** — no error, just an
@@ -234,8 +243,6 @@ with PostgresSaver.from_conn_string(db_url) as checkpointer:
    this module has a side effect on the process environment. Environment loading
    belongs at the entry point.
 3. **Commented-out `logging.basicConfig` and logger-silencing block** at the top
-   of the file, superseded by `utils.setup_logging()`. `logging` is imported
-   solely for those dead lines and is otherwise unused — this module logs
-   nothing at all, which makes a silent empty stream (see above) harder to
-   diagnose than it needs to be.
+   of the file, superseded by `utils.setup_logging()`. Dead lines; the module
+   has a real logger now.
 4. **No cheap-model split for summarisation** — see `summarize_node` above.

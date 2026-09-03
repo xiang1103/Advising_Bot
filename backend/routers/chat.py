@@ -69,6 +69,7 @@ def chat(payload: ChatRequest, request:Request):
     # The graph is compiled here on the first request that picks each model, so
     # this must stay above the return like every other fallible step
     graph = request.app.state.graph_registry.get(payload.model)
+    logger.info("Thread %s selected model %r", payload.thread_id, payload.model)
 
     # Run retrieval up front so any pre-stream failure surfaces as a real HTTP 500
     # (the status can no longer be changed once the streaming response has started)

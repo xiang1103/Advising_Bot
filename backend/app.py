@@ -16,6 +16,12 @@ from backend.db.error_handler import (
     DatabaseUnavailable,
 )
 from backend.routers import chat, threads
+from backend.utils import setup_logging
+
+# nothing configures the root logger otherwise, and its default level hides
+# INFO - including the per-reply model line in agent_graph. verbose=False here
+# means ERROR only, which switches those off again
+setup_logging(verbose=True)
 
 logger = logging.getLogger(__name__)
 

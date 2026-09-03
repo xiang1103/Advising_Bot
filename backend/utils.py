@@ -23,3 +23,5 @@ def setup_logging(verbose: bool = False) -> None:
     # silence the supabase logger.info() logs  
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # the Gemini SDK logs "AFC is enabled..." at INFO on every single call
+    logging.getLogger("google_genai").setLevel(logging.WARNING)

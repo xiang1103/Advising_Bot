@@ -44,10 +44,12 @@ backend/
 - **`config.py` holds constants only.** No I/O, no clients, no env reads.
 - **`schema.py` is a shared contract**, not just backend types — see the root
   `CLAUDE.md` for the frontend and SQL counterparts it must agree with.
-- **`utils.setup_logging(verbose=False)`** configures the root logger and
-  silences `httpx`/`httpcore`. **Nothing calls it**, so the service currently
-  runs on Python's default logging config; its docstring also disagrees with its
-  code (DEBUG/WARNING vs. INFO/ERROR).
+- **`utils.setup_logging(verbose=True)` is called at `app.py` import time**, and
+  it configures the root logger and silences `httpx`/`httpcore`/`google_genai`.
+  **`verbose` is the difference between INFO and ERROR — not DEBUG and WARNING
+  as its docstring claims.** It has to be `True` for the per-reply model line in
+  `agent_graph/langgraph.py` to appear at all; flipping it to `False` silently
+  switches off every INFO log in the service.
 
 ---
 
@@ -132,5 +134,7 @@ because breaking one from a different layer is the realistic failure mode.
 Area-specific issues are listed at the bottom of each nested file. These belong
 to the modules this file owns:
 
-1. **`utils.setup_logging()` is never called**, so none of the logging
-   configuration is in effect. `app.py` should call it during startup.
+1. **`setup_logging`'s docstring disagrees with its code** — it promises
+   DEBUG/WARNING and delivers INFO/ERROR.
+2. **Logging verbosity is hardcoded** to `verbose=True` in `app.py`. Fine for
+   local development, wrong for anything deployed; it wants an env var.
